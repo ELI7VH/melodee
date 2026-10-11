@@ -71,7 +71,8 @@ static uint32_t user_of(const track_t *t)    /* user preset slot its sound came 
 static uint32_t up_gen;                      /* bumped on every user bank change (redraws) */
 static uint8_t browse_loads, browse_mark;    /* sound loads so far; at the browser's opening (ui_browser.c: back) */
 #include "favorites.c"
-/* MENU settings in favorites.factory[15][30]: bit 0 retired, bit 1 KNOB ACCEL OFF, bits 2..3 OVERCLOCK (overclock.c). */
+/* MENU settings in favorites.factory[15][30] (saved with the settings): bit 0 FX LATCH (settings_persist.c
+ * settings_latch), bit 1 KNOB ACCEL OFF (ui_input.c accel_by; clear in older settings = ON), bits 2..3 OVERCLOCK (overclock.c) */
 #define PREF_BITS (favorites.factory[15][30])
 #define PREF_ACCEL_OFF 2u
 
@@ -117,8 +118,8 @@ static struct {
     recorded_note_t note_identity; /* retain focus when unrelated event storage changes */
     uint8_t entry_open;          /* SEQ: keys held since the first press of this entry */
     uint8_t step_move;           /* a held SELECT modifier gesture: one edit until the modifier is released */
-    uint8_t step_oct_used;       /* OCT buttons consumed by SAVE undo or redo */
-    uint16_t step_mods, step_used; /* STEP's ENV/SCL buttons awaiting release, and the gestures consumed */
+    uint8_t step_oct_used;       /* OCT buttons consumed by FX/SAVE undo or redo */
+    uint16_t step_mods, step_used; /* STEP's ENV/SCL/FX buttons awaiting release, and the gestures consumed */
     uint8_t lane;                /* SEQ > STEP on a DRUM track (the grid): the lane the keys and KNOB 3 / 4 edit */
     uint8_t hot_col, hot_t;      /* column whose knob was just turned (drawn white) */
     uint8_t import_refresh, new_active;
@@ -194,7 +195,7 @@ static uint32_t drum_hit_selected(void);
 static const page_t *cur_page(void) { return page_over ? page_over : &PAGES[ui.page]; }
 
 /* the quick layers (ui_layer.c): a button held, the keys and KNOB 1..4 are its shortcuts, its map over the page */
-enum { LAYER_NONE, LAYER_RESERVED, LAYER_GLO, LAYER_SCL, LAYER_EDIT, LAYER_N };
+enum { LAYER_NONE, LAYER_FX, LAYER_GLO, LAYER_SCL, LAYER_EDIT, LAYER_N };
 static void draw_layer(void);
 static const char *layer_head(void);
 static uint32_t layer_leds(void);
@@ -677,7 +678,7 @@ static void momentary_take(uint32_t slot)
     if(!d || !vp || d->max==d->min)return;
     uint32_t native=pg->scope==SC_FM6 || pg->scope==SC_FMOP?1:pg->scope==SC_CZ1?2:pg->scope==SC_P5?3:0;
     if(!native && pg->scope!=SC_TRACK && pg->scope!=SC_ENGINE &&
-       !(pg->scope==SC_GLOBAL && (pg->id[slot]<=G_SWING)))return;
+       !(pg->scope==SC_GLOBAL && (pg->id[slot]<=G_SWING || (pg->id[slot]>=G_DTIME && pg->id[slot]<=G_CDEPTH) || pg->id[slot]==G_DWEAR)))return;
     if(!native && pg->scope==SC_TRACK && scale_shared((uint32_t)(vp-TSEL->p)))return;
     if(!momentary.active){momentary.track=song.sel;momentary.active=1;}
     if(native && !momentary.native){
@@ -853,12 +854,12 @@ static void track_defaults_steps(track_t *t)
 
 /* the track's settings, not the sound's: what a sound load (factory or user preset, an engine jump,
  * TOOLS INIT) leaves alone. The mix (LEVEL, PAN, MUTE: the TRACKS faders), the arpeggiator (ARP, ARP 2),
- * the scale and key map (SCL), the pattern parameters (LEN, DIV, SWING, GATE),
+ * the scale and key map (SCL), the pattern parameters (LEN, DIV, SWING, GATE) and the SLICER insert,
  * which chops whatever the track plays in time with its sequencer */
 static int param_kept(uint32_t i)
 {
     return i == P_LEVEL || i == P_PAN || i == P_MUTE || (i >= P_AMODE && i <= P_SGATE) ||
-           i == P_CHRD || i == P_VOIC || i == P_MPCDEG || i == P_RECQ;
+           (i >= P_SLCR && i <= P_SLDEPTH) || i == P_CHRD || i == P_VOIC || i == P_MPCDEG || i == P_RECQ;
 }
 
 /* SCL, QNT and the MPC degree are the song's: one scale for every part, kept the same in each track's own slots
@@ -912,6 +913,11 @@ static void apply_preset_to(track_t *t, uint32_t pi)
     t->p[P_REL] = pr->env[3];
     t->p[P_ED_FLT] = pr->fenv;
     t->p[P_VOICE] = pr->mono ? V_LEGATO : V_POLY;   /* mono presets keep the legato feel */
+    {   /* the sends */
+        static const uint8_t FX_DEF[4] = {0, 24, 28, 36};
+        for (i = 0; i < 4u; i++)                      /* (no delay: its sends predate the delay bus coming back) */
+            t->p[P_DIST + i] = (int16_t)(i == 2u ? 0 : pr->fx[i] ? pr->fx[i] - 1 : FX_DEF[i]);
+    }
     if(t->eng_req==ENGI_PROPHET)p5_preset_loaded(t,pi);
     cz_factory_loaded(t);
     cz_track_accept(t);

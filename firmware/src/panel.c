@@ -99,4 +99,5 @@ static void settings_init(void)
         settings.zoom = 0;                     /* large readout of the touched value: off */
     }
     palette_set(settings.palette);
+    fx_lowcut = (uint8_t)(settings.lowcut % 3u);
 }

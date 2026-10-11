@@ -293,18 +293,9 @@ static void recording_tick(track_t *t, uint32_t n)
 {
     uint32_t period = seq_div_samples((uint32_t)t->p[P_SDIV]), tr = trk_index(t);
     uint32_t a = recording_prefix(t, period, t->seq_idx) + t->seq_pos, b = a + n;
-    uint32_t elapsed;
-    if (n <= CTL) {
-        /* At most CTL * 65536 plus one sequencer period: the ordinary
-         * audio tick fits 32 bits, including the slowest supported division. */
-        uint32_t ticks = n * RECORD_UNIT + recording_fraction[tr];
-        recording_fraction[tr] = ticks % period;
-        elapsed = ticks / period;
-    } else {
-        uint64_t ticks = (uint64_t)n * RECORD_UNIT + recording_fraction[tr];
-        recording_fraction[tr] = (uint32_t)(ticks % period);
-        elapsed = (uint32_t)(ticks / period);
-    }
+    uint64_t ticks = (uint64_t)n * RECORD_UNIT + recording_fraction[tr];
+    recording_fraction[tr] = (uint32_t)(ticks % period);
+    uint32_t elapsed = (uint32_t)(ticks / period);
     recording_sync(t, period);
     for (uint32_t i = recording_head[recording_owner(t)]; i < RECORD_MAX; i = recording_next[i]) {
         if ((recording_flags[i] & 1u)) recording_run[i].held = (uint32_t)clamp((int32_t)(recording_run[i].held + elapsed), 0, 8388607);

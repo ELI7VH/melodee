@@ -47,11 +47,11 @@ static uint32_t lfo_rand(track_t *t)
     return s;
 }
 
-/* LFO 2 (1.2, #154; params.c N_LSYNC): with SYNC on, one cycle lasts the note value of the tempo (mix.c div_samples:
+/* LFO 2 (1.2, #154; params.c N_LSYNC): with SYNC on, one cycle lasts the note value of the tempo (fx.c div_samples:
  * BPM, or the external clock's measured tempo while it runs), whatever RATE says (the matrix's RATE too): the phase
  * advances 2^32 x CTL / cycle a block (two 32-bit divides; the 1-bit truncation of 0xFFFFFFFF drifts by less than a
  * millionth of a cycle a cycle). OFF: RATE's table, as before */
-static uint32_t div_samples(uint32_t div);         /* (mix.c) */
+static uint32_t div_samples(uint32_t div);         /* (fx.c) */
 static __attribute__((noinline)) uint32_t lfo_sync_inc(const track_t *t)   /* (not inlined: its divides stay out of
                                                                            * the audio ISR's loop over the tracks) */
 {
@@ -593,7 +593,7 @@ static int32_t env_tick(track_t *t, voice_t *v)
     return v->env >> 9;
 }
 
-/* SPREAD (#148, mix.c mix_spread): while spread_on (mix_part sets it for the part it renders), track_render renders the
+/* SPREAD (#148, fx.c mix_spread): while spread_on (mix_part sets it for the part it renders), track_render renders the
  * voices of side 0 into spread_buf and the others into out, then adds spread_buf to out: out is every voice, as always
  * (the engines add into either the same way), spread_buf the left ones. A cost per block, none per voice */
 static uint8_t spread_on;

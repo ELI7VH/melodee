@@ -520,7 +520,7 @@ static void p5_factory(uint32_t k,p5_patch_t *p)
 static void p5_preset_make(uint32_t k,preset_t *pr,char *name)
 {
     p5_patch_t p;
-    pr->env[2]=127;
+    pr->env[2]=127;memset(pr->fx,1,sizeof pr->fx);                 /* dry: sends 0 (stored + 1) */
     if(!k){str_cpy(name,"INIT PROPHET",21);return;}
     p5_factory(k-1u,&p);p5_patch_name(name,&p);
 }
@@ -544,5 +544,5 @@ static const engine_t ENG_P5_TEST = {
     .preset_make=p5_preset_make,.npresets=P5_FACTORY_N+1u,.poly=P5_POLY,.ownenv=1,
     .note_on=p5_note_on,.render=p5_render,.done=p5_done,.block=p5_block,.units=p5_units,.cap=p5_cap,.legato=p5_legato,
     .post=p5_post,
-    .knob={P_E0,P_E1,P_RESERVED34,P_RESERVED36}
+    .knob={P_E0,P_E1,P_CHOR,P_REV}
 };

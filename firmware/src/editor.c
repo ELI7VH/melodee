@@ -561,7 +561,7 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
     case ED_SET:
         if (na < 2u || !(d = ed_desc(a[0], a[1], &vp)))
             return;
-        if (cmd == ED_SET && na >= 4u && !(a[0] ? global_reserved(a[1]) : param_reserved(a[1])) && !(chain_busy() && !a[0] && a[1] >= P_SLEN && a[1] <= P_SGATE)) {
+        if (cmd == ED_SET && na >= 4u && !(chain_busy() && !a[0] && a[1] >= P_SLEN && a[1] <= P_SGATE)) {
             if (a[0] == 1 && a[1] == G_ENGSEL) {          /* engine change: the safe path */
                 set_engine((uint32_t)clamp(ed_rv(a + 2), 0, NENGINES - 1));
             } else if (d->max > d->min) {
@@ -866,7 +866,7 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
             return;
         t = &trk[a[0]];
         d = ed_tdesc(t, a[1]);
-        if (na >= 4u && !param_reserved(a[1]) && !(chain_busy() && a[1] >= P_SLEN && a[1] <= P_SGATE)) {
+        if (na >= 4u && !(chain_busy() && a[1] >= P_SLEN && a[1] <= P_SGATE)) {
             if (d->max > d->min)                           /* as SET: clamped; a fixed value stays */
                 t->p[a[1]] = (int16_t)enum_orig(d, clamp(ed_rv(a + 2), d->min, d->max));
             (void)motion_capture(t, a[1], t->p[a[1]]);

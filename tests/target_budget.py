@@ -188,9 +188,7 @@ def main():
                "phase_render", "formant_render", "noise_render",
                "px_modal_block", "px_modal_run", "px_memb_block", "px_string_excite",
                "px_string_run", "px_symp_run"}
-    disabled = set()
-    missing = [n for n in FUNCS if n not in res and n not in OPTIONAL and n not in FEATURE_OPTIONAL and n not in retired and n not in disabled]
-    if disabled: print("target: resident audio profile has delay/reverb disabled; their absent kernels are excluded")
+    missing = [n for n in FUNCS if n not in res and n not in OPTIONAL and n not in FEATURE_OPTIONAL and n not in retired]
     base = {}
     if os.path.exists(budget):
         for line in open(budget):

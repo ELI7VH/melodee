@@ -71,9 +71,10 @@
 #include "core.h"
 #include "engines.c"             /* dsp.c, the eng_*.c files, the factory patterns */
 #include "params.c"
-#include "mod.c"               /* the modulation matrix, used by voice.c and mix.c */
+#include "mod.c"               /* the modulation matrix, used by voice.c and fx.c */
 #include "voice.c"
-#include "mix.c"
+#include "slicer.c"              /* per-track SLICER insert, used by fx.c */
+#include "fx.c"
 
 /* ------------------------------------------------- MIDI, sequencer --- */
 #define MIDI_TIME_NOW() fm1_ticks()
@@ -94,7 +95,7 @@
 #include "ui_draw.c"
 #include "ui_menu.c"
 #include "ui_input.c"
-#include "ui_layer.c"              /* the quick layers (GLO SCL EDIT held) */
+#include "ui_layer.c"              /* the quick layers (FX GLO SCL EDIT held) */
 
 /* --------------------------------------------- storage, update, editor --- */
 #if MELODEE_FLASH

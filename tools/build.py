@@ -297,10 +297,7 @@ def check(img, syms, dis, rt):
                 call = re.search(r"\bcall -?\d+ <[^>]* : ([0-9a-f]+) >", line)
                 if call and int(call[1], 16) >= APP_XIP:
                     errors.append(f"audio function {current} calls XIP directly")
-        notes.append(f"audio RAM: {live} linked functions verified in SRAM; dry mixer, no effects")
-    for name in ("rev_room", "rev_spring", "rev_hall", "dly_bus", "chorus", "distortion", "sl_enter", "sl_block", "perf_begin", "perf_block", "perf_end"):
-        if sym(name):
-            errors.append(f"removed effect {name} must not be linked")
+        notes.append(f"audio RAM: {live} linked functions verified in SRAM")
     # FM6's sample loops share internal RAM with Prophet. Outlined helpers
     # must stay there too: a flash fetch per sample defeats the optimization,
     # and direct RAM/XIP calls exceed the target's branch range.
