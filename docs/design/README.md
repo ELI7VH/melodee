@@ -37,15 +37,16 @@ Texts differ on purpose (the device's own sound names): the targets leave room f
 ## Synth-only HOME
 
 The reference is the previous firmware's Stage (`cd4f94e`, rendered by its own `tests/ui_render.c`), not the mockups.
-The synth build keeps its header and its panel unchanged (y 178..238: the chord and notes in front of the smooth
-waveform, dimmed while held; the knob turning's picture and value) and draws its one track's column, the selected
-one, across the four columns' place (x 4..236, y 22..174, outlined in the track's colour on the panel's fill, in two
-canvas slices): the bar and the role (the sound's category, else `T1`), the sound in the knob values' type (15 px,
-one line or two), the engine, the pills of what plays the keys drawn as the patterns' pills were (filled: the ARP's
-mode, HOLD, CHORD, the scale; dashed: HOLD waiting for the ARP), the voices as the step dots (a dot a voice the engine
-can sound: lit while sounding, the newest larger in text, dimmer while releasing), and five of the level's rings:
-LEVEL (dB) and the four sends (%), each labelled as the columns are. A knob turned drops the four knob cards over the
-card's top as before. The footer starts with the engine (one track: no numeral).
+The synth build keeps its header and its panel (y 178..238: the chord and notes in front of the smooth waveform,
+dimmed while held) and draws its one track's column across the four columns' place (x 4..236, y 22..174, on the
+panel's fill, in two canvas slices), in the four track colours as the four columns were: the four columns' bars, the
+role (the sound's category, else `T1`) in the track's colour, the sound in the knob values' type (15 px, one line or
+two), the engine, the level ring at the top right (dB), the pills of what plays the keys drawn as the patterns' pills
+were, each in a column's colour (ARP coral, HOLD amber, CHORD mint, the scale lilac; HOLD with the ARP off dashed),
+the voices as the step dots (four a column slot, in its colour: lit while sounding, the newest larger in text, dimmer
+while releasing), and the four sends as the level's ring under the slots (DST CHO DLY REV, each in its slot's colour).
+A knob turned drops the four knob cards over the card's top as before, each in its slot's colour; the panel's picture
+and value take the turning knob's colour. The footer starts with the engine (one track: no numeral).
 
 `tests/synth_ui_render.c` renders the shared states (`ref_stage_*`, `synth_home`, `synth_home_playing`), every
 factory sound of every engine on Stage under the layout lint (`stage_name_e<N>`: each engine's longest), and every

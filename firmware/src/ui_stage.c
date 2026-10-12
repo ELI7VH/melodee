@@ -1,16 +1,18 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* Melodee's Stage (HOME) in the synth build: the previous firmware's Stage with its one track. The track's column,
- * drawn as before (the selected one: outlined in its colour; on the panel's fill, the rings' tracks showing), across
- * the four columns' place: the bar and its
- * role (the sound's category) in its colour, the sound, the engine, the pills of what plays the keys as the patterns'
- * were drawn (filled: on, dashed: HOLD waiting for the ARP), its voices as the step dots (lit while sounding, the
- * newest larger in text, releasing dimmer), its level and its four sends as the level's ring, five across. Under it the panel, unchanged: the notes played and
- * their chord in front of the waveform, smooth, dimmed while held. The first turn of a knob drops the track's four knobs
- * (its engine's, stage_page) down over the card's top (ST_DROP frames); while they are out the panel shows what the
- * knob turning shapes and its value; ST_KNOB_MS after the last turn they go and the card is whole again.
- * Each part remembers what it drew: the card redraws when its sound, pills or level change, the voices their row
- * alone; the panel follows the scope every other frame, drawn last (the SPI, 12 MHz, sends it while the next frame is
- * worked out: a blit right after it would wait for it, lcd_window). */
+ * across the four columns' place, in their four colours (on the panel's fill, the rings' tracks showing): the four
+ * columns' bars, the role (the sound's category) in the track's colour, the sound, the engine, its level as the ring
+ * at the top right, the pills of what plays the keys as the patterns' were drawn, each in a column's colour (filled:
+ * on, dashed: HOLD waiting for the ARP), its voices as the step dots, four a column slot in its colour (lit while
+ * sounding, the newest larger in text, releasing dimmer), and its four sends as the level's ring under the slots, each
+ * in its slot's colour. Under it the panel, unchanged: the notes played and their chord in front of the waveform,
+ * smooth, dimmed while held. The first turn of a knob drops the track's four knobs (its engine's, stage_page), each in
+ * its slot's colour, down over the card's top (ST_DROP frames); while they are out the panel shows what the knob
+ * turning shapes and its value, in its colour;
+ * ST_KNOB_MS after the last turn they go and the card is whole again.
+ * Each part remembers what it drew: the card redraws when its sound, pills, level or sends change, the voices their
+ * row alone; the panel follows the scope every other frame, drawn last (the SPI, 12 MHz, sends it while the next frame
+ * is worked out: a blit right after it would wait for it, lcd_window). */
 #define ST_COL_Y Y_LABEL                                /* the card: the four columns' place, x 4 .. 236, y 22 .. 174 */
 #define ST_COL_X CARD_X(0)
 #define ST_COL_W (CARD_X(3) + CARD_W - CARD_X(0))
@@ -54,6 +56,7 @@ static void stage_columns(void)
 {
     const page_t *sp = stage_page();
     uint32_t c;
+    uint16_t theme = ux.theme;
     for (c = 0; c < 4u; c++) {
         int16_t *vp;
         const char *unit;
@@ -61,6 +64,7 @@ static void stage_columns(void)
         const param_desc_t *d = page_desc(sp, c, &vp);
         int dim = (sp->scope == SC_CZ1 && !cz_ed_active(cz_patch[song.sel % NTRK].raw, sp->id[c])) ||
                   (sp->scope == SC_P5 && !p5_ed_active(TSEL, sp->id[c]));
+        ux.theme = T_TRK(c);                            /* each card in its column slot's colour */
         if (!d || !vp || !d->label || d->label[0] == '-') {
             draw_column(c, "", "", "", T_THEME, -1, ICON_NONE);
             continue;
@@ -69,6 +73,7 @@ static void stage_columns(void)
         draw_column(c, stage_label(c, d), val, unit, dim ? T_DIM : VAL(c), d->fmt == F_ENUM && d->max < 2 ? -1 : RATIO(d, *vp),
                     ICON_NONE);
     }
+    ux.theme = theme;
 }
 
 /* ------------------------------------------------------- the panel --- */
@@ -209,11 +214,11 @@ static void stage_panel(void)
     for (i = 0; i < 4u; i++) held |= live_held[sel][i] != 0u;
     fm1_irq_on();
     pic = stage_picture(pv);
-    /* behind: the waveform (dimmed while notes are held), or what the knob turning shapes */
+    /* behind: the waveform (dimmed while notes are held), or what the knob turning shapes (in its card's colour) */
     if (pic == SP_FILTER)
-        stage_filter(pv[0], pv[1], ux_mix(T_PANEL, T_THEME, 55));
+        stage_filter(pv[0], pv[1], ux_mix(T_PANEL, T_TRK(ui.hot_col), 55));
     else if (pic == SP_ENV)
-        graph_adsr_v(pv[0], pv[1], pv[2], pv[3], 4, ST_PANEL_H - 8, ux_mix(T_PANEL, T_THEME, 55));
+        graph_adsr_v(pv[0], pv[1], pv[2], pv[3], 4, ST_PANEL_H - 8, ux_mix(T_PANEL, T_TRK(ui.hot_col), 55));
     else
         stage_wave(held ? ux_mix(T_PANEL, T_THEME, 40) : T_THEME, 4, ST_PANEL_H - 8);
     cv_over = 1;                                        /* in front: blended over it */
@@ -227,7 +232,7 @@ static void stage_panel(void)
         if (d && vp) {
             stage_value(sp, d, *vp, val, &unit);
             str_cpy(val + str_len(val), unit, 4);
-            cv_text_r(228, 4, &AF_M, val, T_THEME, T_PANEL);
+            cv_text_r(228, 4, &AF_M, val, T_TRK(ui.hot_col), T_PANEL);
         }
     }
     cv_over = 0;
@@ -266,8 +271,8 @@ static int32_t stage_pill(int32_t x, int32_t y, const char *s, int dashed, uint1
     }
     return x + w + 3;
 }
-/* the track's voices as the steps were drawn: a dot a voice its engine can sound, lit in c while it sounds, dimmer while
- * it releases, the newest larger in text; ox: the card's x 0 on the canvas */
+/* the track's voices as the steps were drawn: a dot a voice its engine can sound, four a column slot in its colour, lit
+ * while it sounds, dimmer while it releases, the newest larger in text; ox: the card's x 0 on the canvas */
 static uint32_t stage_voice_state(const track_t *t, uint32_t i)   /* 0 free, 1 releasing, 2 sounding, 3 the newest */
 {
     const voice_t *v = &t->v[i];
@@ -277,12 +282,13 @@ static uint32_t stage_voice_state(const track_t *t, uint32_t i)   /* 0 free, 1 r
         return 1;
     return i == t->m_vi ? 3u : 2u;
 }
-static void stage_voices_at(const track_t *t, uint16_t c, uint16_t bg, int32_t ox)
+static void stage_voices_at(const track_t *t, uint16_t bg, int32_t ox)
 {
     uint32_t i, n = trk_nvoice(t);
-    for (i = 0; i < n && i < NVOICE; i++) {
-        uint32_t s = stage_voice_state(t, i);
-        int32_t x = ox + 11 + (int32_t)i * 136 / 10;
+    for (i = 0; i < n && i < NVOICE; i++) {             /* four a column slot, as its steps' dots, in its colour */
+        uint32_t s = stage_voice_state(t, i), k = i / 4u;
+        uint16_t c = T_TRK(k);
+        int32_t x = ox + CARD_X(k) - ST_COL_X + 8 + (int32_t)(i % 4u) * 113 / 10;
         cv_circle(x, 6, s == 3u ? 6 : 5, s == 3u ? T_TEXT : s == 2u ? c : s == 1u ? ux_mix(bg, c, 40) : T_LINE, bg);
     }
 }
@@ -302,13 +308,13 @@ typedef struct {
     int pending;
     uint16_t tc, bg;
 } stage_card_t;
-/* the name in the knob values' type (15 px): one line, else two (cut at the last space, '.' or '-' that fits), else
- * free text; rows 19 .. 53 */
+/* the name in the knob values' type (15 px), in the first three column slots: one line, else two (cut at the last
+ * space, '.' or '-' that fits), else free text; rows 19 .. 53 */
 static void stage_name(const char *s, uint16_t c, uint16_t bg)
 {
     char a[24], b[24];
     uint32_t i, cut = 0;
-    const int32_t w = ST_COL_W - 12;
+    const int32_t w = CARD_X(3) - ST_COL_X - 8;         /* (the level's ring in the last slot) */
     if (text_w(&AF_M, s) <= w) {
         cv_text_on(6, 19, &AF_M, s, c, bg);
         return;
@@ -330,12 +336,13 @@ static void stage_name(const char *s, uint16_t c, uint16_t bg)
 }
 /* a ring as the columns' level was drawn (KNOB_RING, 3 px, from 7:30, its value inside), its label over it in c, centred
  * on cx; v 0..127 */
-static void stage_ring(int32_t cx, const char *label, int32_t v, const char *val, uint16_t c, uint16_t bg)
+static void stage_ring(int32_t cx, int32_t cy, const char *label, int32_t v, const char *val, uint16_t c, uint16_t bg)
 {
     int32_t a1 = v ? -KA_END + v * 2 * KA_END / 127 : -KA_END - 1;
-    cv_text_c(cx, 104, &AF_X, label, c, bg);
-    knob_arc(cx - KNOB_RING_R, 134 - KNOB_RING_R, KNOB_RING_R, KNOB_RING_COV, KNOB_RING_ANG, -KA_END, a1, T_LINE, c, bg);
-    cv_text_c(cx, 129, &AF_X, val, v ? T_TEXT : T_DIM, bg);
+    if (label)
+        cv_text_c(cx, cy - 30, &AF_X, label, c, bg);
+    knob_arc(cx - KNOB_RING_R, cy - KNOB_RING_R, KNOB_RING_R, KNOB_RING_COV, KNOB_RING_ANG, -KA_END, a1, T_LINE, c, bg);
+    cv_text_c(cx, cy - 5, &AF_X, val, v ? T_TEXT : T_DIM, bg);
 }
 static void stage_card_draw(const track_t *t, const stage_card_t *c)
 {
@@ -343,40 +350,41 @@ static void stage_card_draw(const track_t *t, const stage_card_t *c)
     static const char *const SEND[4] = {"DST", "CHO", "DLY", "REV"};
     uint32_t i;
     char v[8];
-    cv_rrect(0, 0, ST_COL_W, ST_COL_H, 6, c->tc, T_BG); /* the selected track: outlined in its colour */
-    cv_rrect(1, 1, ST_COL_W - 2, ST_COL_H - 2, 5, c->bg, c->tc);
+    cv_rrect(0, 0, ST_COL_W, ST_COL_H, 6, c->bg, T_BG);
     if (!stage.out) {                                   /* (under the knobs, while they are out: not drawn) */
-        cv_rect(3, 0, ST_COL_W - 6, 3, c->tc);          /* the bar */
+        for (i = 0; i < 4u; i++)                        /* the four columns' bars, each in its colour */
+            cv_rect(CARD_X(i) - ST_COL_X + 3, 0, CARD_W - 6, 3, c->mute ? T_DIM : T_TRK(i));
         cv_text_on(6, 6, &AF_X, c->cat == CAT_KEYS ? "CHORDS" : c->cat && c->cat != CAT_OTHER ? CAT_NAME[c->cat] : "T1",
                    c->tc, c->bg);
         stage_name(c->nm, c->pending ? T_ACCENT : c->mute ? T_DIM : T_TEXT, c->bg);
+        if (c->lvl) {                                   /* the level, its ring at the top right (dB) */
+            int32_t d = LEVEL_DB_X10[c->lvl];
+            fmt_int(v, (d + (d < 0 ? -5 : 5)) / 10);
+        } else {
+            str_cpy(v, "OFF", sizeof v);
+        }
+        stage_ring(CARD_X(3) - ST_COL_X + 27, 30, 0, (int32_t)c->lvl, v, c->tc, c->bg);
     }
     cv_text_fit(6, 55, &AF_X, c->en, T_MID, c->bg, ST_COL_W - 8);
-    {   /* what plays the keys, as the patterns' pills: on filled, HOLD with the ARP off dashed (waiting) */
+    {   /* what plays the keys, as the patterns' pills, each in a column's colour: on filled, HOLD with the ARP off
+         * dashed (waiting) */
         int32_t x = 6;
         if (c->amode)
-            x = stage_pill(x, 69, AM[c->amode], 0, c->tc, c->bg);
+            x = stage_pill(x, 69, AM[c->amode], 0, T_TRK(0), c->bg);
         if (c->hold)
-            x = stage_pill(x, 69, "HOLD", !c->amode, c->tc, c->bg);
+            x = stage_pill(x, 69, "HOLD", !c->amode, T_TRK(1), c->bg);
         if (c->chord)
-            x = stage_pill(x, 69, "CHORD", 0, c->tc, c->bg);
+            x = stage_pill(x, 69, "CHORD", 0, T_TRK(2), c->bg);
         if (c->qnt)
-            (void)stage_pill(x, 69, c->scl, 0, c->tc, c->bg);
+            (void)stage_pill(x, 69, c->scl, 0, T_TRK(3), c->bg);
     }
     cv_oy += ST_VOICE_Y;                                /* the voices, as the step dots */
-    stage_voices_at(t, c->tc, c->bg, 0);
+    stage_voices_at(t, c->bg, 0);
     cv_oy -= ST_VOICE_Y;
-    if (c->lvl) {                                       /* the level (dB), then the sends (%), five rings across */
-        int32_t d = LEVEL_DB_X10[c->lvl];
-        fmt_int(v, (d + (d < 0 ? -5 : 5)) / 10);
-    } else {
-        str_cpy(v, "OFF", sizeof v);
-    }
-    stage_ring(ST_COL_W / 10, "LEVEL", (int32_t)c->lvl, v, c->tc, c->bg);
-    for (i = 0; i < 4u; i++) {
+    for (i = 0; i < 4u; i++) {                          /* the sends: a ring under each column slot, in its colour */
         int32_t s = clamp(c->send[i], 0, 127);
         fmt_int(v, s * 100 / 127);
-        stage_ring(ST_COL_W * (3 + 2 * (int32_t)i) / 10, SEND[i], s, v, c->tc, c->bg);
+        stage_ring(CARD_X(i) - ST_COL_X + 27, 134, SEND[i], s, v, c->mute ? T_DIM : T_TRK(i), c->bg);
     }
 }
 #define ST_SLICE 84                                     /* the card in two canvases: rows 0 .. 83 (the knobs' rows, the
@@ -422,7 +430,7 @@ static void stage_card(void)
         if (vs != stage.voices) {                       /* the voices alone: their row */
             stage.voices = vs;
             cv_begin(ST_COL_W - 12, ST_VOICE_H, c.bg);
-            stage_voices_at(t, c.tc, c.bg, -6);
+            stage_voices_at(t, c.bg, -6);
             cv_blit((uint32_t)(ST_COL_X + 6), (uint32_t)(ST_COL_Y + ST_VOICE_Y));
         }
         return;
