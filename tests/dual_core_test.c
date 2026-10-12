@@ -150,7 +150,7 @@ static void prophet_allocation(void)
     for(uint32_t i=0;i<8;i++)trk_note_on(&trk[0],48+i,100);
     assert(active_voices(&trk[0])==8 && voices_busy()==VBUDGET);
     for(uint32_t i=1;i<NTRK;i++)trk_note_on(&trk[i],60+i,100);
-    assert(active_voices(&trk[0])==6 && voices_busy()<=VBUDGET);
+    assert(active_voices(&trk[0])==8 && voices_busy()==VBUDGET);
     for(uint32_t i=1;i<NTRK;i++)assert(active_voices(&trk[i])==1);
     /* Native factory unison stays at its requested five; an explicit count
      * of eight is allowed only with an online worker. */

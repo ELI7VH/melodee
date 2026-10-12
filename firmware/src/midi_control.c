@@ -51,8 +51,6 @@ static void midi_expression(track_t *t, const midi_channel_t *c)
 {
     int32_t range = ((int32_t)c->semis * 100 + c->cents) * 256 / 100;
     if(t->eng_req==ENGI_PROPHET)range=(clamp(p5_patch_of(t)->raw[P5_BEND],0,11)+1)*256;
-    if (drum_track(t))
-        return;
     midi_bend_target[trk_index(t)] = (int32_t)c->bend * range / (c->bend < 0 ? 8192 : 8191);
     t->bend_raw = c->bend;                        /* (FM6 bends by its own range: its DX7 function settings) */
 }
@@ -97,7 +95,6 @@ static void midi_release(uint32_t ch, uint32_t note)
             midi_ch[ch].targets &= (uint8_t)~(1u << (id - 1u));
     }
     if (id) {
-        step_midi_edge(id - 1u, 0, 0, ch, note);
         mchord_t *m = mchord_of(ch, note, id);
         uint8_t nn[CHORD_MAX];
         uint32_t n = 1, i;
@@ -135,7 +132,6 @@ static int midi_play(track_t *t, uint32_t ch, uint32_t note, uint32_t vel)
         nn[0] = (uint8_t)note;
     }
     for (i = 0; i < n; i++) {
-        step_midi_edge(trk_index(t), nn[i], 1, ch, note);   /* (SEQ > STEP: the cursor step) */
         if (!midi_note_held(t, nn[i]) && !midi_local_held(t, nn[i]))
             input_on(t, nn[i], vel);
     }
@@ -163,17 +159,14 @@ static void midi_note_event(uint32_t ch, uint32_t note, uint32_t vel)
         midi_expression(t, c);
         if (!midi_play(t, ch, note, vel))           /* (a note the layout silences: no owner) */
             return;
-        if (t != TSEL)
-            midi_hint = (uint8_t)(trk_index(t) + 1u);
         c->targets |= (uint8_t)(1u << trk_index(t));
         mn_set(ch, note, trk_index(t) + 1u);
         midi_owners[trk_index(t)]++;
         c->owned[trk_index(t)]++;
     } else if (id) {
-        if (c->pedal && !drum_track(&trk[id - 1u])) {
-            step_midi_edge(id - 1u, 0, 0, ch, note);   /* physical release ends step entry, even under sustain */
+        if (c->pedal)
             mn_set(ch, note, mn_get(ch, note) | MIDI_PEDAL_NOTE);
-        } else
+        else
             midi_release(ch, note);
     }
 }
@@ -193,7 +186,6 @@ static void __attribute__((noinline)) midi_forget_track(uint32_t track)
 {
     uint32_t ch, note;
     memset(live_held[track], 0, sizeof live_held[track]);
-    step_midi_edge(track, 0, 2, 0, 0);          /* one UI release for the whole track */
     for (ch = 0; ch < 16u; ch++) {
         if (!(midi_ch[ch].targets & (1u << track)))
             continue;
@@ -214,8 +206,7 @@ static void midi_silence_track(uint32_t track)
     track_t *t = &trk[track];
     uint32_t i;
     trk_all_off(t);
-    t->nheld = t->arp_phys = t->arp_note = t->rh_n = 0;
-    t->seq_n = t->seq_hold = t->slide_glide = 0;
+    t->nheld = t->arp_phys = t->arp_note = 0;
     for (i = 0; i < NVOICE; i++)
         if (t->v[i].active)
             voice_kill(&t->v[i]);             /* one-block fade, regardless of RELEASE */
@@ -246,9 +237,7 @@ static __attribute__((noinline)) void midi_parameter(track_t *t,uint32_t cc,uint
         uint32_t macro=(map[t->eng_req%NENGINES]>>(cc==74?4:0))&15u;
         if(macro)id=P_E0+macro-1u;else if(cc==74 && t->eng_req==ENGI_CZ)id=P_ED_FLT;
         break; }default:return;}
-    if((cc==72 || cc==73 || cc==75) && motion_native_tag(t)){   /* (the engine's own envelope: its motion too) */
-        uint8_t old[MO_NATIVE_N];uint32_t f=motion_guard();
-        motion_native_peek(t,old);
+    if((cc==72 || cc==73 || cc==75) && (t->eng_req==ENGI_PROPHET || t->eng_req==ENGI_FM6 || t->eng_req==ENGI_CZ)){   /* (the engine's own envelope) */
         if(t->eng_req==ENGI_PROPHET){
             p5_edit_value(t,cc==72?P5_RELEASE_AMP:cc==73?P5_ATTACK_AMP:P5_DECAY_AMP,value);
         }else if(t->eng_req==ENGI_FM6){
@@ -262,14 +251,14 @@ static __attribute__((noinline)) void midi_parameter(track_t *t,uint32_t cc,uint
                 if(cz_ed_put(tr,LCZ_EBASE(line,2)+stage,99u-value*99u/127u,raw))memcpy(cz_patch[tr].raw,raw,128u);
             }
         }
-        motion_native_edited(t,old);motion_unguard(f);return;
+        return;
     }
     if(id>=P_COUNT)return;
     const param_desc_t *d=id<P_E0?&TP[id]:&ENGINES[t->eng_req]->edit[id-P_E0];
     if(d->max==d->min)return;
     int32_t v=d->min+(int32_t)(value*(uint32_t)(d->max-d->min)/127u);
     if(id==P_PAN)v=(int32_t)value-64;
-    t->p[id]=(int16_t)v;motion_capture(t,id,v);
+    t->p[id]=(int16_t)v;
 }
 static void midi_control(uint32_t ch, uint32_t cc, uint32_t value)
 {
@@ -294,7 +283,7 @@ static void midi_control(uint32_t ch, uint32_t cc, uint32_t value)
         for (i = 0; i < NTRK; i++)
             if ((mask & (1u << i)) && !midi_track_held(i)) {
                 trk_all_off(&trk[i]);
-                trk[i].nheld = trk[i].arp_phys = trk[i].arp_note = trk[i].rh_n = 0;
+                trk[i].nheld = trk[i].arp_phys = trk[i].arp_note = 0;
             }
         break;
     case 121:                                      /* Reset All Controllers, keep bend sensitivity */

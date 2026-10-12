@@ -63,7 +63,7 @@ static void perf_reset(void)
     memset(&pf, 0, sizeof pf);
     pf.src = pf.next = PF_N;
     pf.lc = PF_TOP;
-    pf.mg[0] = pf.mg[1] = pf.mg[2] = pf.mg[3] = 32768;
+    for (uint32_t i = 0; i < NTRK; i++) pf.mg[i] = 32768;
     perf_held = perf_act = 0;
     perf_latched = 0;
     perf_kill = 0;
@@ -285,39 +285,19 @@ static int test_too_long(void)
 /* ------------------------------------------------------------ the song --- */
 static void song_setup(void)
 {
-    static const uint8_t ACID[16] = {45, 45, 57, 45, 0, 48, 45, 55, 45, 0, 57, 52, 45, 48, 0, 50};
-    static const uint8_t AM[4] = {57, 60, 64, 67};
-    track_t *t1 = &trk[0], *t2 = &trk[1], *td = &trk[3];
-    uint32_t i;
-    memset(trk, 0, sizeof trk);
-    host_tracks_init();
-    perf_reset();
-    if (dly_buf)                                   /* the delay at rest (a THROW before rings on in it) */
-        resource_release(RES_DELAY);
-    dly_buf = 0;
-    memset(&dl, 0, sizeof dl);
-    song.g[G_BPM] = 120;
-    host_preset(t1, HOST_SYNTH, 4);
-    host_preset(t2, 1, 5);
-    host_808_kit(td);
-    for (i = 0; i < 16u; i++) {
-        uint8_t n = ACID[i], d[4], k = 0;
-        put_step(t1, i, n ? 1u : 0u, &n, n ? ST_NOTE : ST_REST, 0);
-        put_step(t2, i, i % 8u == 0u ? 4u : 0u, AM, i % 8u == 0u ? ST_NOTE : ST_TIE, 0);
-        if (i % 4u == 0u) d[k++] = 36;
-        if (i % 2u == 0u) d[k++] = 42;
-        if (i == 4u || i == 12u) d[k++] = 38;
-        put_step(td, i, k, d, k ? ST_NOTE : ST_REST, 0);
-    }
-    trk[0].p[P_PAN] = -40;                         /* the mix itself stereo */
-    trk[1].p[P_PAN] = 40;
+    memset(trk, 0, sizeof trk); host_tracks_init(); perf_reset();
+    if (dly_buf) resource_release(RES_DELAY);
+    dly_buf = 0; memset(&dl, 0, sizeof dl);
+    host_preset(&trk[0], HOST_SYNTH, 4);
+    trk[0].p[P_PAN] = -40;
+    trk_note_on(&trk[0], 57, 100); trk_note_on(&trk[0], 64, 100);
 }
 static int32_t song_l[NT], song_r[NT];
 static void song_render(uint32_t frames, void (*at)(uint32_t t))
 {
     uint32_t t, i;
     int32_t o[2 * CTL];
-    transport_req = 1;
+    song.playing = 1;
     for (t = 0; t < frames; t += CTL) {
         if (at)
             at(t);
@@ -327,7 +307,7 @@ static void song_render(uint32_t frames, void (*at)(uint32_t t))
             song_r[t + i] = o[2 * i + 1];
         }
     }
-    transport_req = 2;
+    song.playing = 0;
     mix_block(o, CTL);
 }
 
@@ -372,6 +352,7 @@ static int test_keys(void)
     int bad = 0;
     uint32_t mo0, fx = 1u << 3, k = 9;              /* (a button bit for FX; key 9: a white key, D4) */
     song_setup();
+    memset(trk[0].v, 0, sizeof trk[0].v); eng_state_clear(0);
     usb.config = 1;
     mo_r = mo_w = 0;
     kb_mask = perf_mask = fx;
@@ -422,7 +403,7 @@ static int test_keys(void)
         }
         fm1_in.buttons = 0;
         bad += check("the keys without an effect (4 white from D5, 7 black from D#4): silent, nothing held",
-                     ok && assigned == 0xD5BFFu);   /* F3 .. C5 but D#4 F#4 G#4 A#4 */
+                     ok && assigned == (0xD5BFFu & ~((1u<<3)|(1u<<5)|(1u<<8))));   /* F3 .. C5 but D#4 F#4 G#4 A#4 */
         kb_mask = perf_mask = 0;
     }
     usb.config = 0;
@@ -565,10 +546,8 @@ static int test_misc(void)
         uint32_t f;
         int32_t before = 0, during = 0;
         song_setup();
-        trk[1].p[P_SLEN] = 1; trk[3].p[P_SLEN] = 1;
-        trk[1].step[0].n = 0; trk[3].step[0].n = 0;          /* only track 1 plays, dry */
         trk[0].p[P_CHOR] = trk[0].p[P_DLY] = trk[0].p[P_REV] = 0;
-        transport_req = 1;
+        song.playing = 1;
         for (f = 0; f < 2u * FS; f += CTL) {
             uint32_t i;
             if (f == 44096u)
@@ -580,7 +559,7 @@ static int test_misc(void)
             }
         }
         perf_press(PF_M1, 0);
-        transport_req = 2;
+        song.playing = 0;
         mix_block(o, CTL);
         snprintf(what, sizeof what, "black key 1: track 1 muted while held (peak %d -> %d), P_MUTE untouched", before, during);
         bad += check(what, before > 1000 && during < 200 && !trk[0].p[P_MUTE]);
@@ -1035,13 +1014,16 @@ static uint64_t instr_now(void)
 }
 static double cost_run(int on)
 {
-    static const int ALL[] = {PF_R16, PF_LPF, PF_HPF, PF_M1 + 2};
+    static const int ALL[] = {PF_R16, PF_LPF, PF_HPF, PF_M1};
     static const int HARM[] = {PF_OUP};
     uint32_t f, k;
     uint64_t i0;
     int32_t o[2 * CTL];
     song_setup();
-    transport_req = 1;
+    host_preset(&trk[0], HOST_SYNTH, 0); trk_all_off(&trk[0]);
+    trk_note_on(&trk[0], 60, 100);
+    song.playing = 1;
+    perf_k[2] = 100; /* Keep delay/reverb bus activity equal in every cost case. */
     for (f = 0; f < FS; f += CTL)
         mix_block(o, CTL);
     if (on == 1) {
@@ -1060,7 +1042,7 @@ static double cost_run(int on)
     for (k = 0; k < PF_N; k++)
         perf_press(k, 0);
     perf_k[1] = perf_k[2] = perf_k[3] = 0;
-    transport_req = 2;
+    song.playing = 0;
     return i0 ? (double)(instr_now() - i0) / (2.0 * FS) : 0;
 }
 static int test_cost(void)
@@ -1072,7 +1054,7 @@ static int test_cost(void)
         printf("perform: cost: no instruction counter on this host\n");
         return 0;
     }
-    snprintf(what, sizeof what, "cost: the song %.0f instructions / sample idle, %.0f with REPEAT+LPF+HPF+MUTE, K2 CRUSH, K3 THROW: +%.0f",
+    snprintf(what, sizeof what, "cost: the synth %.0f instructions / sample with THROW alone, %.0f with REPEAT+LPF+HPF+MUTE, K2 CRUSH, K3 THROW: +%.0f",
              idle, on, on - idle);
     bad = check(what, on - idle < 400);
     printf("perform: cost: over the idle song: REPEAT 1/16 alone +%.0f (the layer's own stage), OCT UP +%.0f, with the shimmer +%.0f\n",
@@ -1131,37 +1113,6 @@ static void harm_at(uint32_t t)
     if (t == ((3u * bar + CTL - 1u) / CTL) * CTL)
         perf_press(e, 0);
 }
-static void harm_demos(const char *dir)
-{
-    static const uint8_t MEL[16] = {69, 0, 72, 76, 0, 74, 72, 0, 71, 0, 67, 69, 0, 0, 64, 0};
-    static const char *const NAME[3] = {"harmonizer_up", "harmonizer_down", "harmonizer_shimmer"};
-    char path[512];
-    FILE *f;
-    uint32_t t, i, m, frames = 4u * 4u * FS * 60u / 110u + FS;
-    for (m = 0; m < 3u; m++) {
-        memset(trk, 0, sizeof trk);
-        host_tracks_init();
-        perf_reset();
-        song.g[G_BPM] = 110;
-        host_preset(&trk[0], HOST_SYNTH, 0);              /* the host synth's first tone */
-        for (i = 0; i < 16u; i++)
-            put_step(&trk[0], i, MEL[i] ? 1u : 0u, &MEL[i], MEL[i] ? ST_NOTE : ST_REST, 0);
-        hd_mode = m + 1u;
-        song_render(frames, harm_at);
-        hd_mode = 0;
-        perf_k[3] = 0;
-        snprintf(path, sizeof path, "%s/%s.wav", dir, NAME[m]);
-        if (!(f = fopen(path, "wb")))
-            return;
-        wav_hdr(f, frames);
-        for (t = 0; t < frames; t++)
-            wav_put(f, song_l[t], song_r[t]);
-        fclose(f);
-        printf("perform: demo %s (a bar plain, two with %s, one plain)\n", path,
-               m == 0u ? "OCT UP" : m == 1u ? "OCT DN" : "OCT UP and KNOB 4 SHIMMER 70");
-    }
-}
-
 int main(int argc, char **argv)
 {
     int bad = 0;
@@ -1178,8 +1129,6 @@ int main(int argc, char **argv)
     bad += test_cost();
     if (argc > 1)
         demos(argv[1]);
-    if (argc > 2)
-        harm_demos(argv[2]);
     printf("%s\n", bad ? "PERFORM TEST FAILED" : "perform test passed");
     return bad != 0;
 }

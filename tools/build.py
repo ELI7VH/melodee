@@ -6,7 +6,7 @@
   tools/build.py [--release X.Y[.Z][-suffix]]
 
 Outputs in build/: melodee.bin (app), loader/ota.bin (update loader),
-melodee.fwsc (package). A release build (--release X.Y) writes melodee-X.Y.fwsc and a folder
+melodee-synth.fwsc (package). A release build (--release X.Y) writes melodee-X.Y.fwsc and a folder
 release-X.Y/ with the package, the app, SHA256SUMS, the licence files.
 See BUILDING.md for the toolchain and the SDK.
 
@@ -415,8 +415,8 @@ def main():
     mode.add_argument("--release", metavar="X.Y[.Z]", help="release build: identity FM-1_9XY[Z], version string vX.Y[.Z]")
     ap.add_argument("--sdk", type=Path, help="JieLi AC79 SDK checkout (default: $AC79_SDK)")
     a = ap.parse_args()
-    name = "melodee.fwsc"
     variant = "-1core" if os.environ.get("MELODEE_DUAL_CORE") == "0" else ""
+    name = f"melodee-synth{variant}.fwsc"
     if a.release:                   # X one digit, Y one or two (1.0: FM-1_910; 1.0.0: FM-1_91000),
         m = re.fullmatch(r"(\d)\.(\d{1,2})(?:\.(\d))?(-[A-Za-z0-9]+)?", a.release)   # Z one (Y two with it)
         if not m:
@@ -426,8 +426,8 @@ def main():
         name = f"melodee-{a.release}{variant}.fwsc"
     if a.nightly:
         revision = subprocess.check_output(["git", "rev-parse", "--short=7", "HEAD"], cwd=SRC, text=True).strip()
-        VERSION = "next-" + revision
-        name = f"melodee-nightly{variant}.fwsc"
+        VERSION = "synth-" + revision
+        name = f"melodee-synth-nightly{variant}.fwsc"
     fm1pkg_make.SDK = a.sdk
     for rel, sha in SDK_SHA256.items():          # fail early without the SDK
         if hashlib.sha256(fm1pkg_make.sdk_file(rel)).hexdigest() != sha:

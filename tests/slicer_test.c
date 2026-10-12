@@ -168,76 +168,6 @@ static int test_timing(void)
 }
 
 /* ------------------------------------------------------------ the song --- */
-static void song_setup(void)
-{
-    static const uint8_t ACID[16] = {45, 45, 57, 45, 0, 48, 45, 55, 45, 0, 57, 52, 45, 48, 0, 50};
-    static const uint8_t ACIDF[16] = {1, 0, 2, 0, 0, 0, 1, 2, 0, 0, 1, 0, 0, 2, 0, 1};
-    static const uint8_t AM[4] = {57, 60, 64, 67}, FMI[4] = {53, 57, 60, 64};
-    static const uint8_t LEAD[12] = {76, 0, 0, 79, 0, 0, 81, 0, 79, 0, 76, 0};
-    track_t *t1 = &trk[0], *t2 = &trk[1], *t3 = &trk[2], *td = &trk[3];
-    uint32_t i;
-    host_tracks_init();
-    memset(sl, 0, sizeof sl);
-    song.g[G_BPM] = 120;
-    host_preset(t1, HOST_SYNTH, 4);
-    host_preset(t2, 1, 5);
-    host_preset(t3, 3, 0);
-    host_808_kit(td);                   /* saved SAMPLE PERC sound */
-    for (i = 0; i < 16u; i++) {
-        uint8_t n = ACID[i];
-        put_step(t1, i, n ? 1u : 0u, &n, n ? ST_NOTE : ST_REST, ACIDF[i]);
-    }
-    t2->p[P_SLEN] = 32;
-    t2->p[P_SGATE] = 120;
-    for (i = 0; i < 32u; i++)
-        put_step(t2, i, i % 16u == 0u ? 4u : 0u, i < 16u ? AM : FMI, i % 16u == 0u ? ST_NOTE : i % 16u < 14u ? ST_TIE : ST_REST, 0);
-    t3->p[P_SLEN] = 12;
-    for (i = 0; i < 12u; i++) {
-        uint8_t n = LEAD[i];
-        put_step(t3, i, n ? 1u : 0u, &n, n ? ST_NOTE : ST_REST, i == 0u ? SF_ACCENT : 0u);
-    }
-    for (i = 0; i < 16u; i++) {
-        uint8_t n[4];
-        uint32_t k = 0;
-        if (i % 4u == 0u)
-            n[k++] = 36;
-        if (i == 4u || i == 12u)
-            n[k++] = 38;
-        if (i % 2u == 0u)
-            n[k++] = i == 14u ? 46 : 42;
-        put_step(td, i, k, n, k ? ST_NOTE : ST_REST, i % 4u == 0u ? SF_ACCENT : 0u);
-    }
-}
-
-/* ------------------------------------------------------------ 3. sync --- */
-static int test_sync(void)
-{
-    uint32_t f, k, blocks = 0, miss = 0;
-    char what[160];
-    song_setup();
-    song.g[G_SWING] = 15;
-    for (k = 0; k < NTRK; k++) {
-        trk[k].p[P_SSWING] = (int16_t)(10 * k);
-        trk[k].p[P_SLEN] = 16;                    /* 16 steps of 1/16: the SLICER's bar */
-        set_slicer(&trk[k], k & 1u ? SL_STUT : SL_GATE, (int)(3u + k), 1, 127);
-    }
-    song.g[G_BPM] = 131;
-    transport_req = 1;
-    for (f = 0; f < 12u * FS; f += CTL) {
-        int32_t o[2 * CTL];
-        mix_block(o, CTL);
-        blocks++;
-        for (k = 0; k < NTRK; k++) {              /* the SLICER step that holds the block's first sample */
-            uint32_t idx = sl[k].pos >= CTL ? sl[k].idx : (sl[k].idx + 15u) & 15u;
-            miss += idx != trk[k].seq_idx % 16u;
-        }
-    }
-    transport_req = 2;
-    snprintf(what, sizeof what, "sync: 4 tracks, 131 BPM, swing per track: the sequencer's step at %u blocks x 4", blocks);
-    return check(what, !miss);
-}
-
-/* ------------------------------------------------------- 4. OFF / STUT --- */
 static int test_off_stut(void)
 {
     uint32_t f, i, same = 1, rep_ok = 0, rep_n = 0;
@@ -295,16 +225,17 @@ static double cost_run(int on)
     uint32_t f, k;
     uint64_t i0;
     int32_t o[2 * CTL];
-    song_setup();
+    memset(trk, 0, sizeof trk); host_tracks_init();
+    host_preset(&trk[0], HOST_SYNTH, 4); trk_note_on(&trk[0], 60, 100);
     for (k = 0; k < NTRK; k++)
         set_slicer(&trk[k], on ? (k & 1u ? SL_GATE : SL_STUT) : 0, 4, 1, 100);
-    transport_req = 1;
+    song.playing = 1;
     for (f = 0; f < FS; f += CTL)
         mix_block(o, CTL);
     i0 = instr_now();
     for (f = 0; f < 2u * FS; f += CTL)
         mix_block(o, CTL);
-    transport_req = 2;
+    song.playing = 0;
     return i0 ? (double)(instr_now() - i0) / (2.0 * FS) : 0;
 }
 
@@ -322,66 +253,13 @@ static int test_cost(void)
 }
 
 /* ------------------------------------------------------------ demos --- */
-static void demo_song(const char *dir, const char *name, const int16_t (*s)[4], uint32_t solo)
-{
-    char path[512];
-    FILE *w;
-    uint32_t f, k, frames = 8u * FS;
-    snprintf(path, sizeof path, "%s/%s", dir, name);
-    if (!(w = fopen(path, "wb")))
-        return;
-    song_setup();
-    for (k = 0; k < NTRK; k++) {
-        set_slicer(&trk[k], s[k][0], s[k][1], s[k][2], s[k][3]);
-        if (solo && k + 1u != solo)
-            trk[k].p[P_LEVEL] = 0;
-    }
-    transport_req = 1;
-    wav_hdr(w, frames);
-    for (f = 0; f < frames; f += CTL) {
-        int32_t o[2 * CTL];
-        uint32_t i;
-        mix_block(o, CTL);
-        for (i = 0; i < CTL; i++)
-            wav_put(w, o[2 * i], o[2 * i + 1]);
-    }
-    transport_req = 2;
-    fclose(w);
-}
-
-static void demos(const char *dir)
-{
-    static const int16_t DRY[4][4] = {{0, 1, 1, 127}, {0, 1, 1, 127}, {0, 1, 1, 127}, {0, 1, 1, 127}};
-    static const int16_t PAD_GATE[4][4] = {{0, 1, 1, 127}, {SL_GATE, 1, 1, 127}, {0, 1, 1, 127}, {0, 1, 1, 127}};
-    static const int16_t PAD_GATE2[4][4] = {{0, 1, 1, 127}, {SL_GATE, 15, 2, 110}, {0, 1, 1, 127}, {0, 1, 1, 127}};
-    static const int16_t ACID_STUT[4][4] = {{SL_STUT, 7, 1, 127}, {0, 1, 1, 127}, {0, 1, 1, 127}, {0, 1, 1, 127}};
-    static const int16_t DRUM_STUT[4][4] = {{0, 1, 1, 127}, {0, 1, 1, 127}, {0, 1, 1, 127}, {SL_STUT, 12, 2, 127}};
-    static const int16_t DRUM_GATE[4][4] = {{0, 1, 1, 127}, {0, 1, 1, 127}, {0, 1, 1, 127}, {SL_GATE, 3, 1, 127}};
-    static const int16_t ALL[4][4] = {{SL_STUT, 9, 1, 127}, {SL_GATE, 1, 1, 127}, {SL_GATE, 14, 2, 90},
-                                      {SL_STUT, 12, 2, 110}};
-    demo_song(dir, "song_dry.wav", DRY, 0);
-    demo_song(dir, "song_slicers.wav", ALL, 0);
-    demo_song(dir, "pad_dry.wav", DRY, 2);
-    demo_song(dir, "pad_gate_p1_16th.wav", PAD_GATE, 2);
-    demo_song(dir, "pad_gate_p15_32nd.wav", PAD_GATE2, 2);
-    demo_song(dir, "acid_dry.wav", DRY, 1);
-    demo_song(dir, "acid_stut_p7.wav", ACID_STUT, 1);
-    demo_song(dir, "drums_dry.wav", DRY, 4);
-    demo_song(dir, "drums_gate_p3.wav", DRUM_GATE, 4);
-    demo_song(dir, "drums_stut_p12_32nd.wav", DRUM_STUT, 4);
-    printf("slicer: demos in %s (song_dry / song_slicers, pad, acid, drums: dry and sliced)\n", dir);
-}
-
 int main(int argc, char **argv)
 {
     int bad = 0;
     bad += test_clicks();
     bad += test_timing();
-    bad += test_sync();
     bad += test_off_stut();
     bad += test_cost();
-    if (argc > 1)
-        demos(argv[1]);
     printf("%s\n", bad ? "SLICER TEST FAILED" : "slicer test passed");
     return bad != 0;
 }

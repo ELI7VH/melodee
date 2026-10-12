@@ -93,6 +93,28 @@ static int up_cz_raw(const up_rec_t *r,uint8_t *raw)
     if(!up_native_cz(r))return 0;
     memcpy(raw,r->packed,CZ_BYTES);return cz_patch_valid(raw);
 }
+/* a DRUM record's patch (the DRUM engine is not in the synth build): checked so the record stays valid as written,
+ * never loaded */
+typedef struct { int8_t c[16][4]; } drum_patch_t;
+static int drum_patch_valid(const drum_patch_t *p)
+{
+    for(uint32_t i=0;i<16;i++)if(p->c[i][0]<-24 || p->c[i][0]>24 || p->c[i][1]<-64 || p->c[i][1]>63 || p->c[i][2]<-64 || p->c[i][2]>63 || p->c[i][3]<0)return 0;
+    return 1;
+}
+#define DRUM_WIRE_BYTES 54u /* 16 voices x (6-bit tune, 7-bit decay/character/attenuation) */
+static uint32_t drum_wire_get(const uint8_t *b,uint32_t *pos,uint32_t n)
+{uint32_t v=0;for(uint32_t i=0;i<n;i++,++*pos)v|=(uint32_t)((b[*pos>>3]>>(*pos&7u))&1u)<<i;return v;}
+static int drum_patch_unpack(drum_patch_t *p,const uint8_t *b)
+{
+    uint32_t pos=0;
+    for(uint32_t i=0;i<16;i++){
+        p->c[i][0]=(int8_t)((int32_t)drum_wire_get(b,&pos,6)-24);
+        p->c[i][1]=(int8_t)((int32_t)drum_wire_get(b,&pos,7)-64);
+        p->c[i][2]=(int8_t)((int32_t)drum_wire_get(b,&pos,7)-64);
+        p->c[i][3]=(int8_t)drum_wire_get(b,&pos,7);
+    }
+    return drum_patch_valid(p);
+}
 static int up_bank_shape(uint32_t len,uint32_t rsize){return len==sizeof(up_bank_t) && rsize==sizeof(up_rec_t);}
 static int up_drum_raw(const up_rec_t *r,drum_patch_t *p)
 {
@@ -226,17 +248,7 @@ static void up_pat_norm(uint8_t *note, uint8_t *flags)   /* tie: no note; rest: 
         *note = 0;
         *flags = 4;
     } else {
-        *flags = *note ? (uint8_t)(*flags & (SF_ACCENT | SF_SLIDE)) : 0u;
-    }
-}
-
-static void up_pat_from(up_rec_t *r, const step_t *st)   /* the first 16 steps -> the pattern */
-{
-    uint32_t i;
-    for (i = 0; i < 16u; i++) {
-        r->note[i] = st[i].time == ST_NOTE && st[i].n ? st[i].note[0] : 0u;
-        r->flags[i] = st[i].time == ST_TIE ? 4u : st[i].flags;
-        up_pat_norm(&r->note[i], &r->flags[i]);
+        *flags = *note ? (uint8_t)(*flags & 3u) : 0u;            /* (1 accent, 2 slide) */
     }
 }
 
@@ -440,25 +452,11 @@ static int up_store(uint32_t k, const char *name)
     r.np = P_COUNT;
     up_set_name(&r, k, name);
     for (i = 0; i < P_COUNT; i++)
-        up_set_value(&r, i, motion_base_value(TSEL, i));
+        up_set_value(&r, i, TSEL->p[i]);
     if (r.engine == ENGI_CZ && TSEL->p[P_E7] == CZ_NATIVE) {
         r.ver = UP_VER_CZ;
         memcpy(r.packed, cz_patch[song.sel % NTRK].raw, CZ_BYTES);
     }
-    up_pat_from(&r, TSEL->step);
-    if (drum_track(TSEL)) {                             /* a DRUM track that strikes a lane: its grid */
-        uint32_t any = 0;
-        for (i = 0; i < 16u; i++)
-            any |= step_lanes(&TSEL->step[i]);
-        if (any) {
-            r.ver = UP_VER_GRID;
-            for (i = 0; i < 16u; i++) {
-                r.note[i] = (uint8_t)step_lanes(&TSEL->step[i]);
-                r.flags[i] = (uint8_t)step_accents(&TSEL->step[i]);
-            }
-        }
-    }
-    if(r.engine==ENGI_DRUM){uint8_t b[DRUM_WIRE_BYTES];drum_patch_pack(b,&drum_patch[song.sel]);memcpy(r.cz_extra,b,sizeof r.cz_extra);memcpy(r.packed+r.np,b+sizeof r.cz_extra,8u);r.ver=r.ver==UP_VER_GRID?UP_VER_DRUM_GRID:UP_VER_DRUM;}
     int rc = up_put(k, &r);
     if ((rc == 0 || rc == 3) && r.engine == ENGI_FM6) {    /* its voice: native FM6 slot k */
         uint8_t pk[FM6_PACKED];
@@ -504,7 +502,6 @@ static int up_load(uint32_t k)
                 t->p[i] = v[i];
         t->preset = 0;
         if (up_native_cz(r))up_cz_raw(r,cz_patch[song.sel % NTRK].raw);
-        if(r->engine==ENGI_DRUM){memset(&drum_patch[song.sel],0,sizeof(drum_patch_t));if(r->ver==UP_VER_DRUM || r->ver==UP_VER_DRUM_GRID)up_drum_raw(r,&drum_patch[song.sel]);}
         cz_track_accept(t);
         fm1_irq_on();
         if (t->eng_req == ENGI_FM6) {                   /* FM6: its voice, native slot k (else INIT) */
@@ -563,7 +560,7 @@ static void up_ui_named(uint32_t op, uint32_t k, const char *name)   /* 0 load, 
         ui_message(up_old(k) ? "OLD FORMAT" : "EMPTY SLOT");
         return;
     }
-    if (op && (song.playing || chain_busy() || transport_req == 1u)) {    /* (up_put refuses too) */
+    if (op && song.playing) {                           /* (up_put refuses too) */
         ui_message("STOP TO SAVE");
         return;
     }

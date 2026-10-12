@@ -91,11 +91,6 @@ static void voice_tests(void)
     for(uint32_t k=0;k<8;k++)trk_note_on(t,60+k,100);
     check("eight notes cap at five sounding Prophet voices",active(t)==5u);
     check("five Prophet voices use fifteen of sixteen shared units",voices_busy()==15u);
-    for(uint32_t part=1;part<4;part++){
-        host_preset(&trk[part],3,0);trk[part].p[P_VOICE]=V_POLY;
-        trk_note_on(&trk[part],48+part,100);
-    }
-    check("shared allocation keeps three Prophet and all three other tracks",voices_busy()==15u&&active(t)==3u&&active(&trk[1])==1u&&active(&trk[2])==1u&&active(&trk[3])==1u);
     setup();t=&trk[0];p5_patch_t *p=p5_patch_of(t);
     p->raw[P5_RELEASE_AMP]=90;t->p[P_REL]=0;
     trk_note_on(t,60,100);for(uint32_t k=0;k<32;k++)tick();trk_note_off(t,60);

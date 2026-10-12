@@ -328,38 +328,6 @@ static void test_cost(void)
     check(what, pp <= 1.5 * room && pp * 0.017 <= 2.0);
 }
 
-static void demo(const char *dir, const char *name, int type, int wear)
-{
-    static const uint8_t PL[16] = {64, 0, 67, 0, 71, 0, 0, 74, 72, 0, 67, 0, 64, 0, 62, 0};
-    char path[512];
-    FILE *f;
-    uint32_t t, i, frames = 10u * FS;
-    int32_t o[2 * CTL];
-    track_t *tr = &trk[0];
-    memset(trk, 0, sizeof trk);
-    bus_reset(type, 11, 70, 51, 85, wear);
-    song.g[G_BPM] = 100;
-    host_preset(tr, HOST_SYNTH, 9);                             /* CZ-1 ACO.GUITAR: a pluck */
-    for (i = 0; i < 16u; i++)
-        put_step(tr, i, PL[i] ? 1u : 0u, &PL[i], PL[i] ? ST_NOTE : ST_REST, 0);
-    tr->p[P_DLY] = 90;
-    tr->p[P_REV] = tr->p[P_CHOR] = 0;
-    snprintf(path, sizeof path, "%s/%s.wav", dir, name);
-    if (!(f = fopen(path, "wb")))
-        return;
-    wav_hdr(f, frames);
-    transport_req = 1;
-    for (t = 0; t < frames; t += CTL) {
-        if (t <= 7u * FS && t + CTL > 7u * FS)
-            transport_req = 2;                                  /* the last 3 s: the repeats alone */
-        mix_block(o, CTL);
-        for (i = 0; i < CTL; i++)
-            wav_put(f, o[2 * i], o[2 * i + 1]);
-    }
-    fclose(f);
-    printf("delay: demo %s\n", path);
-}
-
 int main(int argc, char **argv)
 {
     test_off();
@@ -369,12 +337,6 @@ int main(int argc, char **argv)
     test_glide();
     test_idle();
     test_cost();
-    if (argc > 1) {
-        demo(argv[1], "delay_digi", 0, 64);
-        demo(argv[1], "delay_tape", 1, 64);
-        demo(argv[1], "delay_tape_worn", 1, 127);
-        demo(argv[1], "delay_tape_pingpong", 3, 64);
-    }
     printf("%s\n", bad ? "DELAY TEST FAILED" : "delay test passed");
     return bad != 0;
 }

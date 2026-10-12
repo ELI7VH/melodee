@@ -7,7 +7,7 @@ static struct {
     const uint8_t *data;
     uint8_t raw[238];
 } sx_import;
-static struct { uint16_t anchor, end; uint8_t on, engine, track, pattern; uint32_t generation; uint8_t notes[RECORD_MAX/8u]; } bulk;
+static struct { uint16_t anchor, end; uint8_t on, engine, track; } bulk;
 static uint8_t sx_checksum(const uint8_t *p,uint32_t n)
 {
     uint32_t sum=0;while(n--)sum+=*p++;return (uint8_t)(-sum&127u);
@@ -17,7 +17,7 @@ static uint32_t library_engine(void)
     return sx_import.count && !ui.home && cur_page()->graph == GR_USER ? sx_import.engine : TSEL->eng_req;
 }
 static uint32_t library_native(void) { return sx_import.count && sx_import.general && !ui.home && cur_page()->graph==GR_USER ? 0u : native_limit(library_engine()); }
-static void bulk_clear(void) { bulk.on = 0; ui.note_copy = ui.note_move = 0; ui.force = 1; }
+static void bulk_clear(void) { bulk.on = 0; ui.force = 1; }
 static int bulk_has(uint32_t k)
 {
     uint32_t a = bulk.anchor < bulk.end ? bulk.anchor : bulk.end;
@@ -33,7 +33,7 @@ static void sysex_import_name(char *nm)
 static int sysex_stage(uint32_t e, const uint8_t *raw, uint32_t count, uint32_t size)
 {
     if(!count || (count*size>sizeof sx_import.raw && !(e==ENGI_FM6&&count==32u&&size==FM6_PACKED)))return 0;
-    if (sx_import.count || ui.confirm || ui.name_active || ui.new_active || ui.layer || ui.ly || designer_on()) { ui_message("FINISH CURRENT IMPORT"); return 0; }
+    if (sx_import.count || ui.confirm || ui.name_active || ui.layer || ui.ly || designer_on()) { ui_message("FINISH CURRENT IMPORT"); return 0; }
     if(count*size>sizeof sx_import.raw){sx_import.data=raw;fm6_rx_ready=2;}
     else {memcpy(sx_import.raw,raw,count*size);sx_import.data=sx_import.raw;}
     sx_import.general=size==238u;
@@ -42,7 +42,7 @@ static int sysex_stage(uint32_t e, const uint8_t *raw, uint32_t count, uint32_t 
     bulk_clear();
     ui.menu = ui.layer = ui.ly = 0;
     for(uint32_t p=0;p<NPAGES;p++)if(PAGES[p].graph==GR_USER){ui.page=(uint8_t)p;break;}
-    ui.import_refresh=1;ui.home=0;ui.fam_last[FAM_SAVE]=ui.page;ui.uslot=0;song.seq_mode=0;ui.entry_open=0;ui.note_pick=0;ui.act=0;seq_midi_reset();
+    ui.import_refresh=1;ui.home=0;ui.fam_last[FAM_SAVE]=ui.page;ui.uslot=0;ui.act=0;
     char nm[16];sysex_import_name(nm);
     ui_say("IMPORT ", nm); str_cpy(ui.msg2, "CHOOSE USER SLOTS", sizeof ui.msg2); ui.force = 1;
     return 1;

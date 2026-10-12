@@ -997,3 +997,30 @@ The web editor displays and edits the raw native byte while preserving its engin
 INFO advertises motion capability version 2 (`4D 02 40 01`), so cached v1 editors
 do not offer a motion interface that would truncate native parameter IDs. The current editor
 accepts both versions 1 and 2 and retains all other tagged capabilities.
+
+
+## Synth-only branch
+
+INFO retains the engine and parameter IDs and reports **one track and zero steps**. Its trailer is:
+
+```
+0, 0x55, 1, uiCaps,
+0x42, 1, 3,
+0x53, 1,
+0x46, 1, FM6_NFAC, 0,
+0x43, 1, CZ_BYTES_lo, CZ_BYTES_hi, 0, 0,
+0x35, 1, 19, USER_GENERAL, USER_NATIVE_FM, USER_NATIVE_CZ, USER_NATIVE_P5, 0, 1,
+0x4e, 1, NATIVE_FM_SLOTS, 0, NATIVE_CZ_SLOTS_lo, NATIVE_CZ_SLOTS_hi
+```
+
+`0x53, 1` identifies this variant. Native libraries, sound edits, live sync, device preferences,
+USB diagnostics and bounded backups remain. UI caps omit recording preferences. Sequencer,
+pattern, motion, song and project commands do not receive replies and must not be requested.
+All live sound commands address track 0; stored engine identities and user namespaces stay fixed.
+
+The backup manifest contains IDs 0–28. Runtime project ID 0 is empty; IDs 2–5 preserve the main
+firmware's saved projects as opaque flash objects. New ID 28 holds the current `synth_state_t`
+(`YNS1`, size, complete sound/native patches/globals/octave, FNV-1a checksum). It is validated
+before writing its dedicated A/B object and applied after restoration. Settings retain the
+main-firmware template. A full synth archive requires settings and synth state, rather than
+a live project. The editor keeps Backup in Settings for this variant.

@@ -11,13 +11,13 @@ enum { MI_COLOR, MI_LOWCUT, MI_HOLD, MI_LIGHTS,
 #if MELODEE_USB_AUDIO
        MI_USB,
 #endif
-       MI_CLICK, MI_CLICK_LEVEL, MI_COUNTIN, MI_PREVIEW, MI_ADD, MI_LATCH, MI_ACCEL, MI_SCREEN, MI_CLOCK, MI_PANEL, MI_ABOUT, MI_DESIGNER, MI_BACK,
+       MI_LATCH, MI_ACCEL, MI_SCREEN, MI_CLOCK, MI_PANEL, MI_ABOUT, MI_DESIGNER, MI_BACK,
        MI_COUNT };
 static const char *const MI_NAME[MI_COUNT] = {"COLOR", "SPEAKER", "HOLD", "LIGHTS",
 #if MELODEE_USB_AUDIO
                                               "USB AUDIO",
 #endif
-                                              "AUDIO CLICK", "CLICK LEVEL", "COUNT-IN", "NOTE PREVIEW", "CHORD ENTRY", "FX LATCH",
+                                              "FX LATCH",
                                               "KNOB ACCEL", "SCREEN OFF", "OVERCLOCK", "CALIBRATION", "ABOUT", "SOUND DESIGNER", "BACK"};
 #if MELODEE_USB_AUDIO
 /* USB AUDIO's four settings, as ua_off_want (UA_OFF_OUT | UA_OFF_IN) */
@@ -179,17 +179,13 @@ static int32_t menu_scroll_max(void)
     return h > MENU_DOC_H ? h - MENU_DOC_H : 0;
 }
 
-/* the menu's header (0..24): its title, the REC mark, the way back */
+/* the menu's header (0..24): its title, the way back */
 static void menu_head(void)
 {
     cv_begin(240, MENU_HEAD, T_BG);
     cv_text(8, 2, &AF_M, ui.menu == 2 ? "About" : "Settings", T_TEXT);
-    if (ui.menu >= 2) {                               /* the way back at the right, the REC mark before it (then */
-        cv_icon_mid(226, MENU_HEAD / 2, 12, ICON_X_UNDO, T_MID, T_BG);   /* (OCT-) */
-        draw_rec_mark(204, T_BG);
-    } else {
-        draw_rec_mark(178, T_BG);
-    }
+    if (ui.menu >= 2)                                 /* the way back at the right (OCT-) */
+        cv_icon_mid(226, MENU_HEAD / 2, 12, ICON_X_UNDO, T_MID, T_BG);
     cv_blit(0, Y_HEAD);
 }
 
@@ -231,7 +227,7 @@ static void draw_menu(void)
 #if MELODEE_USB_AUDIO
                             ua_off_want * 92821u +
 #endif
-                            song.rec * 65537u + song.sel * 13u +
+                            song.sel * 13u +
                             (ui.menu == 2 ? ui.menu_scroll * 48611u : 0u);
     if (!ui.force && sig == ui.menu_sig)
         return;
@@ -273,11 +269,6 @@ static void draw_menu(void)
             }
             menu_words(w, MI_NAME[i], sizeof w);
             cv_text_on(12, yt, &AF_S, w, sel ? T_TEXT : T_SEC, bg);
-            if (i >= MI_CLICK && i <= MI_ADD)
-                value = i==MI_CLICK?(const char *const[]){"OFF","REC","ON"}[settings_click%3u]:
-                  i==MI_CLICK_LEVEL?(const char *const[]){"LOW","MID","HIGH"}[settings_click_level%3u]:
-                  i==MI_COUNTIN?(const char *const[]){"OFF","1 BAR","2 BARS"}[settings_countin%3u]:
-                  i==MI_PREVIEW?(settings_preview?"ON":"OFF"):(settings_chord_add?"ADD":"HOLD");
             if (i == MI_LATCH) value = settings_latch ? "ON" : "OFF";
             if (i == MI_ACCEL) value = PREF_BITS & PREF_ACCEL_OFF ? "OFF" : "ON";
             if (i == MI_SCREEN) value = (const char *const[]){"NEVER", "5 MIN", "15 MIN", "30 MIN", "60 MIN"}[scr_get()];
@@ -391,13 +382,6 @@ static void menu_input(uint32_t oct)                  /* oct: ui_input.c oct_tap
         uint32_t v = settings_hold % 4u;
         settings_hold = (uint8_t)(s > 0 ? (v < 3u ? v + 1u : 3u) : s < 0 ? (v ? v - 1u : 0u) : (v + 1u) % 4u);
         ok = 0;
-    }
-    if((s || ok) && ui.menu==1 && ui.menu_sel>=MI_CLICK && ui.menu_sel<=MI_ADD){
-        uint32_t id=ui.menu_sel-MI_CLICK,top=id<3?2:1;
-        uint32_t value=id==0?settings_click:id==1?settings_click_level:id==2?settings_countin:id==3?settings_preview:settings_chord_add;
-        value=s>0?(value<top?value+1:value):s<0?(value?value-1:0):(value+1)%(top+1);
-        if(id==0)settings_click=value;else if(id==1)settings_click_level=value;else if(id==2)settings_countin=value;else if(id==3)settings_preview=value;else settings_chord_add=value;
-        ok=0;ui.force=1;
     }
     if ((s || ok) && ui.menu==1 && ui.menu_sel==MI_ACCEL) {   /* KNOB 1 right ON, left OFF; OCT+ toggles */
         uint32_t on = s > 0 ? 1u : s < 0 ? 0u : !!(PREF_BITS & PREF_ACCEL_OFF);

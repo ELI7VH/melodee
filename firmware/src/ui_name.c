@@ -1,13 +1,12 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
-/* Melodee UI: NAME, naming a user preset or a project on the device (included by ui_input.c).
+/* Melodee UI: NAME, naming a user preset or a CZ-1 tone on the device (included by ui_input.c).
  *
- * Where: SAVE > USER, SAVE (KNOB 4, OCT+) and SAVE > PROJECT, SAVE: after the OVERWRITE? dialog when the slot is
- * used, the NAME screen opens before anything is written; OCT+ writes, OCT- cancels (back to the page, nothing
- * written). EDIT on those pages renames the selected slot (only its name is written). The name is prefilled:
- * USER the sound's own (the user preset it came from) or the automatic one ("DIGITAL 14"), PROJECT the current
- * project's (as loaded or last saved; none: "PROJECT A"), so SAVE, OCT+, OCT+ saves with the default name.
- * Writing needs the transport stopped (STOP TO SAVE; the screen stays).
+ * Where: SAVE > USER, SAVE (KNOB 4, OCT+): after the OVERWRITE? dialog when the slot is used, the NAME screen opens
+ * before anything is written; OCT+ writes, OCT- cancels (back to the page, nothing written). EDIT on that page
+ * renames the selected slot (only its name is written). The name is prefilled: the sound's own (the user preset it
+ * came from) or the automatic one ("FM6 14"), so SAVE, OCT+, OCT+ saves with the default name. Writing needs the
+ * external transport stopped (STOP TO SAVE; the screen stays).
  *
  * The keys type and never sound, record or send MIDI (seq.c keyboard_block: song.grid 2). Upper case, at most 12:
  *   white keys   ABC (letters): AB CD EF GH IJK LM NO PQ RS TU VW XYZ, then 123 456 789 0-. ; phone style: a tap
@@ -18,8 +17,8 @@
  *                before the cursor; held: repeats, as the arrows do), D# ABC / 123.
  *   KNOB 1       the cursor; KNOB 2 the character at the cursor (SPACE A..Z 0..9 - . _ / # +; at the end: a new one).
  *   LEDs         every key that types or edits is lit; the key whose letters are being cycled blinks.
- * Spaces at either end are dropped when it is written; an empty name: USER the automatic one, PROJECT none. */
-enum { NK_NONE, NK_USER_SAVE, NK_USER_RENAME, NK_PROJ_SAVE, NK_PROJ_RENAME, NK_CZ_NAME };
+ * Spaces at either end are dropped when it is written; an empty name: the automatic one. */
+enum { NK_NONE, NK_USER_SAVE, NK_USER_RENAME, NK_CZ_NAME };
 #define NM_LEN 12u
 #define NM_TAP_MS 800u                                 /* multi-tap: the next letter within this */
 #define NM_REP_MS 450u                                 /* a held arrow / DELETE repeats after this, */
@@ -40,7 +39,7 @@ static struct {
     uint32_t t, rep_t;                                 /* fm1_ms of the last tap; of the next repeat */
     uint32_t sig;                                      /* drawn-state cache */
     char s[P5_NAME_LEN + 1u];
-    char ph[P5_NAME_LEN + 1u];                              /* what an empty name saves as / shows ("PROJECT A") */
+    char ph[P5_NAME_LEN + 1u];                              /* what an empty name saves as / shows ("FM6 14") */
 } nm __attribute__((section(".pool")));                /* (zero-initialised; main loop only: off the audio code's .bss) */
 
 static uint32_t name_limit(void)
@@ -56,8 +55,8 @@ static void name_close(void)
         ui.force = 1;
     nm.kind = NK_NONE; ui.name_active = 0;
 }
-/* the keys: 2 = NAME's (silent), 1 = the DRUM grid, 0 = notes (seq.c keyboard_block reads song.grid) */
-static uint32_t keys_mode(void) { return name_on() ? 2u : designer_on() ? 0u : (uint32_t)grid_on(); }
+/* the keys: 2 = NAME's (silent), 0 = notes (seq.c keyboard_block reads song.grid) */
+static uint32_t keys_mode(void) { return name_on() ? 2u : 0u; }
 
 static const char *nm_group(uint32_t p)                /* white key place p's characters */
 {
@@ -108,32 +107,24 @@ static void name_open(uint32_t kind, uint32_t slot)
         }
         else
             str_cpy(b, nm.ph, sizeof b);
-    } else {
-        str_cpy(nm.ph, "PROJECT A", sizeof nm.ph);
-        nm.ph[8] = (char)('A' + (slot & 3u));
-        if (kind == NK_PROJ_RENAME)
-            project_name(slot, b);
-        else
-            project_cur_name(b);
     }
     str_cpy(nm.s, b, sizeof nm.s);
     nm.len = nm.cur = (uint8_t)str_len(nm.s);
     ui.force = 1;
 }
 
-/* SAVE > USER / PROJECT, EDIT: rename the selected slot */
+/* SAVE > USER, EDIT: rename the selected slot */
 static void name_rename(void)
 {
-    int user = cur_page()->graph == GR_USER;
-    uint32_t k = user ? ui.uslot : (uint32_t)song.g[G_SLOT] - 1u;
-    if (!user && song.g[G_SLOT] == PROJ_TMPL)
-        return;                                       /* (the template has no name) */
-    if (!(user ? user_used(k) : project_used(k)))
+    uint32_t k = ui.uslot;
+    if (cur_page()->graph != GR_USER)
+        return;
+    if (!user_used(k))
         ui_message("EMPTY SLOT");
     else if (transport_busy())
         ui_message("STOP TO SAVE");
     else
-        name_open(user ? NK_USER_RENAME : NK_PROJ_RENAME, k);
+        name_open(NK_USER_RENAME, k);
 }
 
 static void nm_commit(void)                            /* the letter being cycled is kept: the cursor past it */
@@ -247,14 +238,8 @@ static void name_ok(void)
     case NK_USER_SAVE:
         user_ui_named(2, nm.slot, b);
         break;
-    case NK_USER_RENAME:
-        user_ui_named(3, nm.slot, b);
-        break;
-    case NK_PROJ_SAVE:
-        project_save_as(nm.slot, b);
-        break;
     default:
-        project_rename(nm.slot, b);
+        user_ui_named(3, nm.slot, b);
         break;
     }
     name_close();
@@ -317,7 +302,7 @@ static uint32_t name_leds(void)
  * then the knobs and the keys */
 static void nm_title(char *b)
 {
-    str_cpy(b, nm.kind == NK_USER_SAVE || nm.kind == NK_PROJ_SAVE ? "SAVE " : "NAME ", 8);
+    str_cpy(b, nm.kind == NK_USER_SAVE ? "SAVE " : "NAME ", 8);
     if(nm.kind==NK_CZ_NAME){str_cpy(b,"NAME CZ TONE",24);return;}
     if (nm.kind <= NK_USER_RENAME)
         user_label(b + 5, nm.slot);
@@ -404,7 +389,7 @@ static void nm_draw_name(void)
     cv_blit(0, 156);
     {                                                   /* the keys */
         int ok = !transport_busy();
-        const char *go = nm.kind == NK_USER_SAVE || nm.kind == NK_PROJ_SAVE ? "Save" : "Rename";
+        const char *go = nm.kind == NK_USER_SAVE ? "Save" : "Rename";
         int32_t gw = text_w(&AF_S, go) + 30;
         cv_begin(240, 24, T_BG);
         cv_rrect(6, 2, 40, 20, 5, T_SURF, T_BG);

@@ -8,8 +8,9 @@ const BACKUP_IDS_CZ = Array.from({length:17},(_,i)=>i);
 const BACKUP_IDS_OWN = Array.from({length:21},(_,i)=>i);
 const BACKUP_IDS_NATIVE = Array.from({length:23},(_,i)=>i);
 const BACKUP_IDS_P5 = Array.from({length:28},(_,i)=>i);
+const BACKUP_IDS_SYNTH = Array.from({length:29},(_,i)=>i);
 const maxSize = id => id >= 32 ? 81920 : (id === 0 || (id >= 2 && id <= 5)) ? 27904 : id>=23&&id<=27?3600:3840;
-const idsOf = (n) => (n === BACKUP_IDS.length ? BACKUP_IDS : n === BACKUP_IDS_V1.length ? BACKUP_IDS_V1 : n === 9 ? BACKUP_IDS_BANKS : n === 17 ? BACKUP_IDS_CZ : n === 21 ? BACKUP_IDS_OWN : n === 23 ? BACKUP_IDS_NATIVE : n === 28 ? BACKUP_IDS_P5 : null);
+const idsOf = (n) => (n === BACKUP_IDS.length ? BACKUP_IDS : n === BACKUP_IDS_V1.length ? BACKUP_IDS_V1 : n === 9 ? BACKUP_IDS_BANKS : n === 17 ? BACKUP_IDS_CZ : n === 21 ? BACKUP_IDS_OWN : n === 23 ? BACKUP_IDS_NATIVE : n === 28 ? BACKUP_IDS_P5 : n === 29 ? BACKUP_IDS_SYNTH : null);
 export const BACKUP_CMD = { LIST: 65, GET: 66, PUT: 67 };
 const BACKUP_CHUNK = 256;
 export const bkU32 = (n) => Array.from({ length: 5 }, (_, i) => (n >>> (i * 7)) & (i === 4 ? 15 : 127));
@@ -91,6 +92,12 @@ export function readBackup(file) {
       if(v.getUint32(0,true)!==0x42435a43 || ![1,2].includes(v.getUint16(4,true)) || v.getUint16(6,true)!==16 || used>>>16 || !bytes[12] || Array.from(bytes.slice(12,28)).some(x=>x>126 || x>0&&x<32))throw new Error("Invalid CZ bank");
       for(let i=0;i<16;i++)if(used>>i&1){const b=bytes.subarray(28+i*144,28+(i+1)*144);if((b[0]&240)||(b[0]>>2)>2||b[1]>1||(b[2]&3)||b[3]>47||[0,57].some(j=>(b[16+j]&15)>9||(b[16+j]>>4)>14||b[18+j]>9||[20,37,54].some(k=>b[k+j]&8)))throw new Error("Invalid CZ bank tone");}
     }
+    if (o.id === 28 && o.size) {
+      const v = new DataView(bytes.buffer);
+      if (o.size < 12 || v.getUint32(0,true) !== 0x31534e59 || v.getUint32(4,true) !== o.size) throw Error("Invalid synth state");
+      let h = 2166136261; for (const b of bytes.subarray(0, -4)) h = Math.imul(h ^ b, 16777619) >>> 0;
+      if (h !== v.getUint32(o.size-4,true)) throw Error("Invalid synth state checksum");
+    }
     if (o.id >= 32 && o.size) {
       if (o.size < 512) throw new Error("Short sample backup");
       const view = new DataView(bytes.buffer), length = view.getUint32(16, true), count = bytes[6];
@@ -105,7 +112,7 @@ export function readBackup(file) {
     }
     return { ...o, bytes };
   });
-  if (!objects[0].size || !objects[1].size) throw new Error("Backup is missing the current music or settings");
+  if (!objects[1].size || (objects.length === 29 ? objects[0].size || !objects[28].size : !objects[0].size)) throw new Error("Backup is missing the current music or settings");
   return { ...file, objects };
 }
 export async function captureBackup(request, firmware, onProgress = () => {}) {
@@ -133,7 +140,7 @@ export async function restoreBackup(request, file, onProgress = () => {}) {
   const ask = async (r, o = {}) => request(r, { timeout: 4000, retries: 0, ...o });
   const supported = bkManifest(await ask([BACKUP_CMD.LIST, []]));
   const liveSize = supported.find(o => o.id === 0)?.size || 0;
-  for (const o of archive.objects) if ((o.id === 0 || o.id >= 2 && o.id <= 5) && o.size > liveSize && !(liveSize >= 19008 && [19084,19092,20224].includes(o.size)))
+  for (const o of archive.objects) if ((o.id === 0 || o.id >= 2 && o.id <= 5) && liveSize > 0 && o.size > liveSize && !(liveSize >= 19008 && [19084,19092,20224].includes(o.size)))
     throw new Error("This backup needs firmware with larger recording storage");
   for (const o of archive.objects) if (!supported.some(x => x.id === o.id) && o.size) throw new Error("This firmware does not support a nonempty object in this backup");
   const put = async (args) => { const a = await ask([BACKUP_CMD.PUT, args]); bkCheck(a[2]); return a; };

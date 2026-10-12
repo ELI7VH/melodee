@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Place the enabled audio call graph in SRAM after LLVM has finished inlining.
 
-The resident profile places the complete dry audio graph in executable POOL SRAM.
+The resident profile places the complete audio graph in executable POOL SRAM.
 Existing flash-safe and low-SRAM DSP sections keep their placement. Crossing
 XIP/SRAM uses a volatile function pointer: pi32v2 direct branches cannot span
 that distance. Calling conventions and function signatures stay unchanged.
@@ -15,7 +15,7 @@ from pathlib import Path
 FUNCTION = re.compile(r'^define ([^\n]+?)@([\w.]+)\(([^\n]*)\)([^\n]*)\{\n(.*?)^}', re.M | re.S)
 REFERENCE = re.compile(r'@([\w.]+)')
 CALL = re.compile(r'\bcall\b[^\n@]*@([\w.]+)\(')
-ROOTS = {'fm1_alnk0_irq', 'audio_block', 'mix_block', 'ua_audio', 'click_render',
+ROOTS = {'fm1_alnk0_irq', 'audio_block', 'mix_block', 'ua_audio',
          'p5_worker_kernel', 'fm6_worker_kernel'}
 CALLBACKS = {'note_on', 'render', 'amp', 'block', 'done', 'alloc', 'legato',
              'mono_key', 'post', 'units', 'cap', 'keys', 'desc'}

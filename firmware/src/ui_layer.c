@@ -69,9 +69,8 @@ static uint32_t layer_bits(void)
 {
     uint32_t l, m = 0;
     for (l = LAYER_FX; l < LAYER_N; l++)
-        m |= ly_bit(l);
-    if (step_modifier_context())
-        m &= ~step_modifier_mask();                      /* synth STEP: SCL, EDIT edit notes */
+        if (l != LAYER_GLO)                             /* (GLO's layer is the tracks': one track here, its page) */
+            m |= ly_bit(l);
     return m;
 }
 static uint32_t layer_btn(void) { return LAYERS[ui.layer % LAYER_N].btn; }
@@ -181,8 +180,8 @@ static uint32_t layer_gesture(uint32_t now, uint32_t combo)
     if (l && lys.dtap) {                                /* #83: a double tap: locked open (no tap) */
         lys.dtap = 0;
         ui.home=lys.nv.home; ui.page=lys.nv.page; ui.act=lys.nv.act;
-        memcpy(ui.fam_last,lys.nv.fam,sizeof ui.fam_last); song.seq_mode=lys.nv.seq;
-        ui.entry_open=0; ui.msg_t=0; ui.lock=(uint8_t)l;
+        memcpy(ui.fam_last,lys.nv.fam,sizeof ui.fam_last);
+        ui.msg_t=0; ui.lock=(uint8_t)l;
         ui.ly_t0=(now&~15u)|1u|LY_OPEN; ui.force=1; layer_opened(l);
         return 0;
     }
@@ -205,7 +204,7 @@ static void layer_show(void)
 static void layer_tap(uint32_t l)
 {
     lys.dt_l=(uint8_t)l; lys.dt_ms=fm1_ms;
-    lys.nv.home=ui.home; lys.nv.page=ui.page; lys.nv.act=ui.act; lys.nv.seq=song.seq_mode;
+    lys.nv.home=ui.home; lys.nv.page=ui.page; lys.nv.act=ui.act;
     memcpy(lys.nv.fam,ui.fam_last,sizeof ui.fam_last);
     uint8_t m = ui.msg_t;
     page_tap(LAYERS[l].btn);
@@ -282,8 +281,6 @@ static void layer_key(uint32_t l, uint32_t k)
         uint32_t sk = key_black(k) ? ly_op_sec(p) : ly_white_sec(p);
         if (sk < sec.n) {
             sec_go(sk);
-        } else if (key_black(k) && p == LY_ACT && chain_busy()) {
-            ui_message("STOP TO EDIT");
         } else if (key_black(k) && p == LY_ACT) {
             confirm_open(CF_INIT_SOUND, song.sel);      /* (the dialog closes the layer) */
         } else if (key_black(k) && p == LY_ACT + 1u) {
@@ -321,9 +318,9 @@ static void layer_knob(uint32_t k, int32_t s)
         if (k == 3u && !perf_harm_on()) s = -s;
         perf_k[k] = (int8_t)clamp(perf_k[k] + accel(EN_K1 + k, s, k ? 100 : 200), k ? 0 : -100, 100);
     } else if (l == LAYER_GLO) {                        /* T1..T4 LEVEL, recorded as on MIXER */
-        int16_t *vp = &trk[k].p[P_LEVEL];
-        *vp = (int16_t)clamp(*vp + accel(EN_K1 + k, s, TP[P_LEVEL].max - TP[P_LEVEL].min), TP[P_LEVEL].min, TP[P_LEVEL].max);
-        motion_capture(&trk[k], P_LEVEL, *vp);
+        int16_t *vp = &trk[k % NTRK].p[P_LEVEL];
+        if (k < NTRK)
+            *vp = (int16_t)clamp(*vp + accel(EN_K1 + k, s, TP[P_LEVEL].max - TP[P_LEVEL].min), TP[P_LEVEL].min, TP[P_LEVEL].max);
     } else if (l == LAYER_EDIT) {                       /* SECTION, No., FAV */
         if (k == 0u) {                                  /* (off the EDIT pages: the first or the last section) */
             sec_build();
@@ -346,19 +343,6 @@ static void layer_knob(uint32_t k, int32_t s)
         ui.home = h;
         ui.page = pg;
     }
-}
-
-/* PLAY with GLO held open: RESTART (from the top, playing on); stopped: PLAY. 1 = done here */
-static int layer_play(void)
-{
-    if (layer_open() != LAYER_GLO || chain_busy())
-        return 0;
-    if (song.g[G_CLOCK] && song.playing) {
-        ui_message("RESTART: CLK IS EXT");
-        return 1;
-    }
-    transport_req = song.playing ? 3u : 1u;
-    return 1;
 }
 
 /* OCT- / OCT+ in a SET layer: no octave; OCT- let go puts back what the layer changed. Returns the taps left */
@@ -476,8 +460,7 @@ static uint32_t layer_leds(void)
             on = e == 0u || (((mask >> e) & 1u) && blink);
         } else if (l == LAYER_EDIT) {                   /* the section shown lit, the others and the actions blink */
             uint32_t sk = b ? ly_op_sec(p) : ly_white_sec(p);
-            on = sk < sec.n ? (sec_on() && sk == sec_of(ui.page)) || blink : b && p >= LY_ACT && p < LY_ACT + 4u && blink &&
-                 !(p == LY_ACT && chain_busy());
+            on = sk < sec.n ? (sec_on() && sk == sec_of(ui.page)) || blink : b && p >= LY_ACT && p < LY_ACT + 4u && blink;
         }
         m |= on << k;
     }
@@ -491,7 +474,7 @@ static uint32_t layer_leds(void)
  * (can be pressed), the selection's fill (the value now, SET), the accent (held, HOLD), DIM (cannot now: pressing
  * it says why), KEY (a muted track, as the MUTE badge); HOLD cells in a SET layer: a corner triangle */
 static const char W_NOTE[16] = {'F', 'G', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'A', 'B', 'C', 'D', 'E', 'F', 'G'};
-static const char B_NOTE[NTRK] = {'F', 'G', 'A', 'C'};  /* black keys 1..4: F# G# A# C# */
+static const char B_NOTE[4] = {'F', 'G', 'A', 'C'};  /* black keys 1..4: F# G# A# C# */
 #define LC_X(c) (6 + 58 * (int32_t)(c))                 /* cell column c: 54 px wide, 4 px apart */
 #define LC_W 54
 #define LC_H 42                                          /* the big cells: rows at y 4 and 50 */
@@ -627,7 +610,7 @@ static void layer_edit(void)
     for (i = 0; i < nb + 4u; i++) {
         int32_t x = 6 + 46 * (int32_t)(i % 5u), yy = y + 24 * (int32_t)(i / 5u);
         uint32_t sk = i < nb ? ly_op_sec(i) : SEC_MAX, a = i - nb;
-        int st = i < nb ? (sk == cur ? LS_SEL : LS_OFF) : a == 0u && chain_busy() ? LS_DIM : LS_OFF;
+        int st = i < nb ? (sk == cur ? LS_SEL : LS_OFF) : LS_OFF;
         uint16_t ink, fill = lc_fill((uint32_t)st, &ink);
         cv_rrect(x, yy, 42, 20, 4, fill, T_SURF);
         cv_text_c(x + 21, yy + 4, &AF_X, i < nb ? sec.name[sk] : LY_ACT_NAME[a], ink, fill);
@@ -641,7 +624,7 @@ static void layer_glo_keys(int32_t h)
 {
     static const char *const WL[8][2] = {{"Solo", "1"}, {"Solo", "2"}, {"Solo", "3"}, {"Solo", "4"}, {"Mute", "all"},
                                          {"", ""}, {"", ""}, {"Tap", "bpm"}};
-    static const uint8_t BX[NTRK] = {0, 1, 2, 4};       /* black key t: between white BX and BX + 1 (F# G# A# C#) */
+    static const uint8_t BX[4] = {0, 1, 2, 4};       /* black key t: between white BX and BX + 1 (F# G# A# C#) */
     const int32_t kw = 28, x0 = 1, wy = 68, by = 24, bh = 38;
     uint32_t i;
     cv_text_on(8, 6, &AF_X, "Keys", T_MID, T_PANEL);
@@ -732,11 +715,11 @@ static void draw_layer(void)
         sig += (perf_kill ? 0u : perf_held | perf_latched) * 31u + perf_act * 131u + perf_avail() * 7u + (uint32_t)perf_harm_on() * 3u;
     else if (l == LAYER_GLO)
         sig += perf_solo * 31u + (uint32_t)song.g[G_CLOCK] * 5u +
-               (uint32_t)(trk[0].p[P_MUTE] | trk[1].p[P_MUTE] << 1 | trk[2].p[P_MUTE] << 2 | trk[3].p[P_MUTE] << 3) * 131u;
+               (uint32_t)trk[0].p[P_MUTE] * 131u;
     else if (l == LAYER_SCL)
         sig += (uint32_t)TSEL->p[P_SCALE] * 31u;
     else
-        sig += snd_id() * 31u + (uint32_t)preset_favorite() * 5u + (uint32_t)chain_busy() * 3u + up_gen * 101u;
+        sig += snd_id() * 31u + (uint32_t)preset_favorite() * 5u + up_gen * 101u;
     if (l == LAYER_FX) {                                /* (the map, the key PRESETS assigns) */
         for (uint32_t p = 0; p < PF_KEYS; p++)
             sig = sig * 33u + perf_map[p];

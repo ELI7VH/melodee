@@ -26,13 +26,12 @@ static int designer_input(uint32_t pressed,uint32_t notes)
     (void)notes;
     if(song.sel!=ds.track || (ui.designer_mode==DS_SHAPE && !ds.compare && TSEL->eng_req!=ds.eng)){
         /* another track or engine (the editor, MIDI): theirs now, nothing restored over them */
-        motion_design_pause&=(uint8_t)~(1u<<ds.track);designer_quit=0;ui.designer_mode=DS_OFF;ui.force=1;
+        designer_quit=0;ui.designer_mode=DS_OFF;ui.force=1;
         if(song.sel==ds.track)ui_message("SOUND CHANGED");
         return 0;
     }
     song.grid=0;kb_mask=perf_mask=kb_lock=0;            /* (the keys play) */
-    seq_midi_events(0);
-    if(pressed&(1u<<panel.btn[B_PLAY]))transport_req=transport_busy()?2:1;
+    if(pressed&(1u<<panel.btn[B_PLAY])){TSEL->p[P_AHOLD]=(int16_t)!TSEL->p[P_AHOLD];ui.force=1;}   /* (PLAY: the ARP's HOLD) */
     panel_enc(EN_ALGO);                                 /* (the track stays the designer's) */
     if(pop.on==POP_SHEET || pop.on==POP_LIST){          /* its sheet (ui_popup.c) */
         int32_t k1=panel_enc(EN_K1),k2=panel_enc(EN_K2);

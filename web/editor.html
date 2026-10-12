@@ -597,6 +597,18 @@ const parse = {
     if (trailer.length >= 4 && [0, 16].includes(trailer[0]) && trailer[1] === 0x55 && trailer[2] === 1)
       o.uiCaps = trailer[3] & 63;                 /* tagged preferences; never interpret old PR bytes as SONG */
     o.motionMax = 0; o.chance = false; o.backupCaps = 0;
+    o.synthOnly = o.nstep === 0 && o.ntrk === 1 && trailer[7] === 0x53 && trailer[8] === 1;
+    if (o.synthOnly) {
+      o.backupCaps = trailer[4] === 0x42 && trailer[5] === 1 ? trailer[6] & 3 : 0;
+      o.fm6 = trailer[9] === 0x46 && trailer[10] === 1 ? {factory:trailer[11], bank:trailer[12]} : null;
+      o.patterns = 0;
+      o.cz = trailer[13] === 0x43 && trailer[14] === 1 && (trailer[15] | trailer[16] << 7) === CZ.BYTES;
+      o.czBanks = 0;
+      o.prophet = trailer[19] === 0x35 && trailer[20] === 1 && trailer[21] === 19;
+      o.namespace = {general:trailer[22], 12:trailer[23], 15:trailer[24], 19:trailer[25]};
+      o.native = {19:trailer[26] | trailer[27] << 7, 12:trailer[30] | trailer[31] << 7, 15:trailer[32] | trailer[33] << 7};
+      return o;
+    }
     if (o.uiCaps && trailer[4] === 0x4d && [1,2].includes(trailer[5]) && trailer[6] === 64) {
       o.motionMax = 64; o.motionVersion = trailer[5]; o.chance = trailer[7] === 1;
       if (trailer[8] === 0x42 && trailer[9] === 1) o.backupCaps = trailer[10] & 3;
@@ -2992,14 +3004,18 @@ function showTab(name) {
 }
 function renderPanels() {
   /* the Tracks tab only with a four-track firmware */
-  const tracksOk = !dev || hasTracks() || !dev.info;
+  const synthOnly = !!dev?.info?.synthOnly;
+  const backupParent = $(synthOnly ? "p-settings" : "p-projects");
+  if ($("backup-panel").parentNode !== backupParent) backupParent.append($("backup-panel"));
+  const tracksOk = !dev || (dev.info?.ntrk > 1) || !dev.info;
   const fm6Off = !!dev && !!dev.info && !dev.info.fm6;             /* the 6-OP FM tab: firmware with FM6 */
-  const want = (tab === "tracks" && dev && dev.info && !hasTracks()) || (tab === "fm6" && fm6Off) ? "sound" : tab;
+  const want = (tab === "tracks" && !tracksOk) || (synthOnly && ["sequencer", "projects"].includes(tab)) || (tab === "fm6" && fm6Off) ? "sound" : tab;
   for (const b of $("tabs").querySelectorAll("button[data-tab]")) {
     const on = b.dataset.tab === want;
     b.setAttribute("aria-selected", on ? "true" : "false");
     b.tabIndex = on ? 0 : -1;
     if (b.dataset.tab === "tracks") b.hidden = !tracksOk;
+    if (["sequencer", "projects"].includes(b.dataset.tab)) b.hidden = synthOnly;
     if (b.dataset.tab === "fm6") b.hidden = fm6Off;
   }
   const ready = !!dev && !!dev.dump;
@@ -3012,7 +3028,7 @@ function renderPanels() {
   }
   $("hint").hidden = !hint;
   if (hint) $("hint").textContent = t(hint);
-  $("trackbar").hidden = !(ready && hasTracks() && TRACK_TABS.has(want));
+  $("trackbar").hidden = !(ready && hasTracks() && dev.info.ntrk > 1 && TRACK_TABS.has(want));
 }
 $("tabs").addEventListener("click", (e) => { const b = e.target.closest("button[data-tab]"); if (b) showTab(b.dataset.tab); });
 $("tabs").addEventListener("keydown", (e) => {          /* arrow keys move between the tabs */
@@ -3225,7 +3241,7 @@ async function load(d) {
       d.names[e] = names;
       d.titles[e] = r.titles;
     }
-    for (let k = 0; k < 4; k++) {                    /* PROJECT op 2: is the slot used */
+    for (let k = 0; !d.info.synthOnly && k < 4; k++) {   /* PROJECT op 2: is the slot used */
       try { d.slotUsed[k] = parse[CMD.PROJECT](await sessionRequest(d, req.project(2, k))).used; }
       catch (e) { if (e.message === "closed") throw e; }
     }
@@ -3381,7 +3397,9 @@ function buildGroups() {
   const groups = { groups: [], seqgroups: [], setgroups: [] };
   const { info } = dev;
   if (knownLayout(info)) {
-    for (const g of LAYOUT(info.pe0)) {
+    for (const original of LAYOUT(info.pe0)) {
+      if (info.synthOnly && original.tab === "seqgroups") continue;
+      const g = info.synthOnly && original.t === "GLOBAL" ? {...original, pages:[["GLOBAL", 1, [0, 2, 3, 21]]]} : original;
       if (dev.dump.engine===15 && ["ENV","EDIT"].includes(g.t)) continue;
       const div = el("div", { class: "group" }, el("h2", { ic: HEAD_IC[g.t], text: g.engine ? `EDIT ${info.engines[dev.dump.engine] || ""}` : g.t }));
       if (g.mod != null) {                          /* MOD: slot number, SRC, DST, AMT in one row */

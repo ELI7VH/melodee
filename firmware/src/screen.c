@@ -71,7 +71,7 @@ static int scr_input(uint32_t pressed, uint32_t notes)
 static int scr_frame(void)
 {
     uint32_t lim = SCR_MIN[scr_get()] * 60000u;
-    if (ui.confirm || ui.uboot || seq_counting()) {    /* (never dark under these) */
+    if (ui.confirm || ui.uboot) {    /* (never dark under these) */
         scrn.idle = fm1_ms;
         if (scrn.st == SCR_OFF)
             scr_wake();

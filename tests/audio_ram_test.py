@@ -58,7 +58,10 @@ class AudioRamTest(unittest.TestCase):
         src=Path(__file__).resolve().parents[1]/'firmware/src'
         roots=engine_roots(src)
         self.assertIn('fm6_key',roots)
-        self.assertIn('drum_keys',roots)
+        self.assertIn('sid_render',roots)
+        self.assertIn('cz_native_render',roots)
+        self.assertIn('p5_render',roots)
+        self.assertNotIn('drum_keys',roots)
         self.assertNotIn('p5_preset_make',roots)
 
     def test_new_callback_requires_classification(self):

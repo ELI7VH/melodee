@@ -41,7 +41,6 @@ static void scale_picker_select(uint32_t id)
 {
     if (id >= SCALE_TOTAL) return;
     TSEL->p[P_SCALE] = (int16_t)id;
-    motion_capture(TSEL, P_SCALE, (int16_t)id);
     scale_share(TSEL);
     ui.force = 1;
 }
@@ -61,10 +60,8 @@ static void scale_picker_edit(uint32_t slot, int32_t steps)
         scale_picker_step(steps);
     } else if (slot == 2u) {
         TSEL->p[P_ROOT] = (int16_t)clamp(TSEL->p[P_ROOT] + steps, TP[P_ROOT].min, TP[P_ROOT].max);
-        motion_capture(TSEL, P_ROOT, TSEL->p[P_ROOT]);
     } else {
         TSEL->p[P_QUANT] = (int16_t)clamp(TSEL->p[P_QUANT] + steps, TP[P_QUANT].min, TP[P_QUANT].max);
-        motion_capture(TSEL, P_QUANT, TSEL->p[P_QUANT]);
         scale_share(TSEL);
     }
     ui.force = 1;

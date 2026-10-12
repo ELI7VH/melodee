@@ -31,15 +31,14 @@ static void audio_block(int32_t *out, uint32_t n)       /* mix (fx.c), then Q15 
     uint32_t i;
     mix_block(out, n);
 #if MELODEE_USB_AUDIO
-    /* the USB audio rings (usb_audio_stream.c): the track stems in, Melodee Out's playback into the output.
+    /* the USB audio rings (usb_audio_stream.c): the master in (Melodee In), Melodee Out's playback into the output.
      * TIMER5 serves the endpoints nested in this render (main.c): only this short copy goes without IRQs,
      * stream resets and alternate changes included, not the synth and FX work */
     fm1_irq_off();
     if (usb.up && usb.config && !usb.suspended)
-        ua_audio(out, track_capture_on ? track_capture : 0, n, song.master_q12);
+        ua_audio(out, n, song.master_q12);
     fm1_irq_on();
 #endif
-    click_render(out, n);
     for (i = 0; i < n; i++) {
         if (i & 1u)
             scope_buf[scope_w++ & (SCOPE_N - 1u)] = (int16_t)out[2u * i];

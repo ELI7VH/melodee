@@ -124,10 +124,7 @@ static void oc_poll(void)
         ui_message("CPU FAULT: 320 MHZ");
     }
     if (oc_restart) {
-        if (transport_busy()) {
-            transport_req = 2;
-            return;
-        }
+        fm1_irq_off(); transport_stop(); fm1_irq_on();
         settings_save();
 #if MELODEE_FLASH
         if (persist_pending)
@@ -176,12 +173,10 @@ static void fm1_fault(const fm1_crash_t *c)
     fm1_reboot();
 }
 
-/* power-on: the parts with their default sounds (TRK_DEF); the sequencers empty */
+/* power-on: the parts with their default sounds (TRK_DEF), before the last state (persist.c state_boot) */
 static void melodee_init(void)
 {
     uint32_t i;
-    chain_defaults(&chain_config);
-    pattern_init();
     for (i = 0; i < G_COUNT; i++)
         song.g[i] = GP[i].def;
     undo_depth++;                             /* (no undo copy of the power-on loads) */
@@ -193,9 +188,6 @@ static void melodee_init(void)
         set_engine_of(t, TRK_DEF[i][0]);
         apply_preset_to(t, TRK_DEF[i][1]);    /* with its sends */
         t->engine = t->eng_req;
-        track_defaults_steps(t);              /* (a sound load never touches them) */
-        pat_sig[i] = steps_sig(t);            /* (empty: not the user's) */
-        pat_last[i] = 0;
     }
     undo_depth--;
     song.sel = 0;
@@ -262,8 +254,7 @@ static void fm1_main(void)
         panel_setup();                        /* OCT- + OCT+ held at power-on */
         settings_save();
     }
-    glo_restore();                            /* CLK TUNE MIDI ROUT as last used, */
-    project_boot();                           /* then the BOOT project or the template (theirs win) */
+    state_boot();                             /* the last state: the sound, the effects, the globals */
     fm1_delay_ms(400);
     lcd_fill(0, 0, 240, 240, T_BG);
 
@@ -356,7 +347,6 @@ static void fm1_main(void)
         melodee_dbg.home = ui.home;
         melodee_dbg.stage = 1;
         ui_input();
-        glo_poll();                                     /* a kept GLO value changed: the settings, later */
         settings_poll();                              /* queued settings save: only while stopped */
 #if MELODEE_DUAL_CORE
         fm1_core1_poll();                             /* a retired CPU1 sits out until power-off */

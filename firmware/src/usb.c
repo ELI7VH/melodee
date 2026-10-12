@@ -12,7 +12,7 @@
  * EP3 bulk data) for the console in console.c.
  * MELODEE_USB_AUDIO=1 instead adds two UAC1 functions (usb_audio.c), a stereo
  * output device "Melodee Out" (EP2 OUT, explicit feedback on EP3) and a separate
- * four-track input device "Melodee In" (EP2 IN), 16 or 24 bit at 44.1 kHz.
+ * stereo input device "Melodee In" (EP2 IN), 16 or 24 bit at 44.1 kHz.
  * Their endpoints are served from the TIMER5 ISR by elapsed time (ua_service,
  * main.c), nested in the render too; usb_poll never runs nested, so the two
  * never interleave. Either can be left out of the configuration (ua_off, the
@@ -353,10 +353,6 @@ static void e0_send(const uint8_t *p, uint16_t len, uint16_t wlen)
 
 #if MELODEE_USB_AUDIO
 #include "usb_audio.c"
-static int ua_capture_active(void)
-{
-    return usb.up && usb.config && !usb.suspended && ua.cap_alt;
-}
 #endif
 
 static void ep0_service(void)

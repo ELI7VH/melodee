@@ -1,15 +1,16 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
-/* UAC1 stereo playback and four-channel capture. No hardware dependencies:
- * callers serialize USB service and each short audio block. Capture takes
- * isolated track stems, so DAW monitoring cannot feed itself through capture.
+/* UAC1 stereo playback and stereo capture. No hardware dependencies:
+ * callers serialize USB service and each short audio block. Capture takes the
+ * synth's master (post-limiter, what the DAC plays) before Melodee Out's playback is mixed in, so DAW monitoring
+ * cannot feed itself through capture.
  *
  * The I2S clock is independent of USB SOF. A low-pass ring-fill servo adjusts
  * capture packet lengths and the playback endpoint's explicit 10.14 feedback.
  * USB and I2S both run at the native 44.1 kHz rate; no resampler is needed. */
 #include <stdint.h>
 #define UA_RATE 44100u
-#define UA_CAP_CHANNELS 4u
+#define UA_CAP_CHANNELS 2u                      /* the master, L R */
 #define UA_MAX_FRAMES 45u                      /* ceil(44.1 + maximum feedback correction) */
 #define UA_PLAY_PACKET (UA_MAX_FRAMES * 2u * 3u)
 #define UA_PACKET (UA_MAX_FRAMES * UA_CAP_CHANNELS * 3u)
@@ -19,7 +20,7 @@
 #ifdef __APPLE__
 #define UA_POOL                                 /* (the host tests: Mach-O has no such section) */
 #else
-#define UA_POOL __attribute__((section(".pool")))   /* the rings, 12 KiB: the pool (zeroed at boot), not RAM */
+#define UA_POOL __attribute__((section(".pool")))   /* the rings, 8 KiB: the pool (zeroed at boot), not RAM */
 #endif
 
 static struct {
@@ -153,13 +154,11 @@ static uint32_t ua_transmit(uint8_t *p)
     return n * width * UA_CAP_CHANNELS;
 }
 
-/* Stereo Q15 monitor plus four pre-master mono stems; playback follows MASTER.
- * Call in blocks of CTL (32), with USB service excluded during this copy.
- * A null stem pointer skips capture for a block collected while capture was
- * disabled; playback still runs, and a newly opened stream sees no stale data. */
-static void ua_audio(int32_t *out, const int32_t *tracks, uint32_t n, uint32_t master_q12)
+/* The stereo Q15 master: captured as it is, then the playback (following MASTER) mixed into it.
+ * Call in blocks of CTL (32), with USB service excluded during this copy. */
+static void ua_audio(int32_t *out, uint32_t n, uint32_t master_q12)
 {
-    uint32_t i, capture = ua.cap_alt && tracks, playback = 0;
+    uint32_t i, capture = ua.cap_alt, playback = 0;
     if (capture && ua.cw - ua.cr + n > UA_RING) {
         ua.cap_overruns++;
         ua_cap_reset();
@@ -181,9 +180,8 @@ static void ua_audio(int32_t *out, const int32_t *tracks, uint32_t n, uint32_t m
         uint32_t pi = ((ua.pr + i) & (UA_RING - 1u)) * 2u;
         int32_t l = out[2u * i], r = out[2u * i + 1u];
         if (capture) {
-            uint32_t ch;
-            for (ch = 0; ch < UA_CAP_CHANNELS; ch++)
-                ua.cap[ci + ch] = (int16_t)ua_clip(tracks[i * UA_CAP_CHANNELS + ch]);
+            ua.cap[ci] = (int16_t)ua_clip(l);
+            ua.cap[ci + 1u] = (int16_t)ua_clip(r);
         }
         if (playback) {
             l += (ua.play[pi] * (int32_t)master_q12) >> 12;

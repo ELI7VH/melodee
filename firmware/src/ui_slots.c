@@ -1,9 +1,9 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* Slot pages (docs/design: mock/r6_popups PROJECT, README "Popups"): PROJECT, SAVE > USER, FM6 STORE and P5 STORE as
- * the list of their slots alone, no action chips. KNOB 1 / 2 the slot, OCT+ its sheet (the page's own actions: act_do
- * in ui_input.c does them, as the chips did), OCT- Stage. The slot picked is a card: its name larger, a line about it,
- * PROJECT's Boot chip on the one power-on loads. PROJECT's last row, New song: OCT+ starts it. Included by ui_draw.c */
-enum { SK_NONE, SK_PROJECT, SK_USER, SK_FM6, SK_P5 };
+/* Slot pages (docs/design: mock/r6_popups, README "Popups"): SAVE > USER, FM6 STORE and P5 STORE as the list of
+ * their slots alone, no action chips. KNOB 1 / 2 the slot, OCT+ its sheet (the page's own actions: act_do in
+ * ui_input.c does them, as the chips did), OCT- Stage. The slot picked is a card: its name larger, a line about it.
+ * Included by ui_draw.c */
+enum { SK_NONE, SK_USER, SK_FM6, SK_P5 };
 #define SL_Y0 22                                        /* the rows from y 22: 22 px, the card 46 */
 #define SL_ROW 22
 #define SL_CARD 46
@@ -18,41 +18,21 @@ static uint32_t slot_kind(void)
     if (ui.home || ui.menu || ui.layer)
         return SK_NONE;
     pg = cur_page();
-    return pg->graph == GR_SLOTS ? SK_PROJECT : pg->graph == GR_USER ? SK_USER : pg->graph == GR_FMSTORE ? SK_FM6 :
-           pg->scope == SC_P5STORE ? SK_P5 : SK_NONE;
+    return pg->graph == GR_USER ? SK_USER : pg->graph == GR_FMSTORE ? SK_FM6 : pg->scope == SC_P5STORE ? SK_P5 : SK_NONE;
 }
-static uint32_t slot_count(uint32_t k) { return k == SK_PROJECT ? (uint32_t)PROJ_TMPL + 1u : user_limit(); }
+static uint32_t slot_count(uint32_t k) { (void)k; return user_limit(); }
 static uint32_t slot_cur(uint32_t k)                    /* the row picked */
 {
     switch (k) {
-    case SK_PROJECT: return ui.proj_new ? (uint32_t)PROJ_TMPL : (uint32_t)song.g[G_SLOT] - 1u;
     case SK_USER: return ui.uslot % user_limit();
     case SK_FM6: return fm6_bslot % user_limit();
     default: return ((uint32_t)p5_store_slot - 1u) % user_limit();
     }
 }
-static uint32_t slot_boot(void)                         /* the row power-on loads (+1), 0 none */
-{
-    return settings_boot && graph_project_used(settings_boot - 1u) ? settings_boot
-           : template_used() ? (uint32_t)PROJ_TMPL : 0u;
-}
-/* row r: its tag ("A", "T", "+", "U07", "F012"), its name, used (2: New song, always) */
+/* row r: its tag ("U07", "F012"), its name, used */
 static int slot_row(uint32_t k, uint32_t r, char *tag, char *nm)
 {
-    if (k == SK_PROJECT) {
-        int used;
-        if (r == (uint32_t)PROJ_TMPL) {
-            str_cpy(tag, "+", 4);
-            str_cpy(nm, "New song", 16);
-            return 2;
-        }
-        tag[0] = (char)(r + 1u == (uint32_t)PROJ_TMPL ? 'T' : 'A' + r);
-        tag[1] = 0;
-        used = r + 1u == (uint32_t)PROJ_TMPL ? template_used() || template_old() : graph_project_used(r);
-        str_cpy(nm, r + 1u == (uint32_t)PROJ_TMPL ? (template_old() ? "OLD FORMAT" : "Template") : used && graph_project_name(r)[0] ? graph_project_name(r)
-                    : used ? "Saved" : "--", 16);
-        return used;
-    }
+    (void)k;
     user_label(tag, r);
     if (!user_used(r) && !user_old(r)) {
         str_cpy(nm, "--", 16);
@@ -63,10 +43,8 @@ static int slot_row(uint32_t k, uint32_t r, char *tag, char *nm)
 }
 static void slot_detail(uint32_t k, uint32_t r, int used, char *b)   /* the card's second line */
 {
-    if (k == SK_PROJECT)
-        str_cpy(b, used == 2 ? "Starts empty" : r + 1u == (uint32_t)PROJ_TMPL ? (used ? "Saved as the template" : "No template")
-                   : used ? "Saved" : "Empty", 24);
-    else if (!used)
+    (void)k; (void)r;
+    if (!used)
         str_cpy(b, "Empty", 24);
     else if (library_native())
         str_cpy(b, ENGINES[eng_idx(library_engine())]->name, 24);
@@ -81,33 +59,12 @@ static void sl_do(uint32_t col)                         /* the page's action in 
     act_do();
     ui.act = 0;
 }
-/* the columns (act_do): PROJECT SLOT BOOT LOAD SAVE; USER SLOT LOAD ERASE SAVE; the STOREs SLOT STORE SEND INIT */
-static void sl_load(void) { sl_do(slot_kind() == SK_PROJECT ? 2u : 1u); }
-static void sl_save(void) { sl_do(slot_kind() == SK_PROJECT || slot_kind() == SK_USER ? 3u : 1u); }
-static void sl_erase(void)
-{
-    uint32_t r = slot_cur(SK_PROJECT);
-    if (slot_kind() != SK_PROJECT)
-        sl_do(2u);                                      /* (USER: act_do asks ERASE U07?) */
-    else if (!graph_project_used(r))
-        ui_message("EMPTY SLOT");
-    else if (transport_busy())
-        ui_message("STOP TO SAVE");
-    else
-        confirm_open(CF_ERASE_PROJ, r);
-}
+/* the columns (act_do): USER SLOT LOAD ERASE SAVE; the STOREs SLOT STORE SEND INIT */
+static void sl_load(void) { sl_do(1u); }
+static void sl_save(void) { sl_do(slot_kind() == SK_USER ? 3u : 1u); }
+static void sl_erase(void) { sl_do(2u); }                /* (USER: act_do asks ERASE U07?) */
 static void sl_send(void) { sl_do(2u); }
 static void sl_init(void) { sl_do(3u); }
-static void sl_boot_v(char *b) { str_cpy(b, settings_boot == song.g[G_SLOT] ? "On" : "Off", 8); }
-static void sl_boot(void)
-{
-    settings_boot = (uint8_t)(settings_boot == song.g[G_SLOT] ? 0 : song.g[G_SLOT]);
-    settings_save();
-    ui.force = 1;
-}
-static const sheet_row_t SHEET_PROJECT[] = {{"Load", 0, 0, sl_load, 0}, {"Save here", 0, 0, sl_save, 0},
-    {"Rename", 0, 0, name_rename, 0}, {"Boot", sl_boot_v, 0, sl_boot, 0}, {"Erase", 0, 0, sl_erase, CF_ERASE_PROJ}};
-static const sheet_row_t SHEET_TEMPLATE[] = {{"Load template", 0, 0, sl_load, 0}, {"Save as template", 0, 0, sl_save, 0}};
 static const sheet_row_t SHEET_IMPORT[] = {{"Import here",0,0,sysex_choose,0},{"Cancel import",0,0,sysex_cancel,0}};
 static const sheet_row_t SHEET_BULK[] = {{"Send selected",0,0,bulk_send,0},{"Erase selected",0,0,bulk_erase_ask,CF_BULK_ERASE},{"Clear selection",0,0,bulk_clear,0}};
 static const sheet_row_t SHEET_USER[] = {{"Load", 0, 0, sl_load, 0}, {"Save here", 0, 0, sl_save, 0},
@@ -115,7 +72,7 @@ static const sheet_row_t SHEET_USER[] = {{"Load", 0, 0, sl_load, 0}, {"Save here
 static const sheet_row_t SHEET_STORE[] = {{"Save here", 0, 0, sl_save, 0}, {"Send", 0, 0, sl_send, 0},
     {"Init sound", 0, 0, sl_init, 0}};
 
-/* OCT+ on a slot: its sheet (New song: starts it) */
+/* OCT+ on a slot: its sheet */
 static void slot_enter(void)
 {
     uint32_t k = slot_kind(), r;
@@ -125,25 +82,12 @@ static void slot_enter(void)
         return;
     r = slot_cur(k);
     if(k==SK_USER && sx_import.count){sysex_import_name(nm);sheet_open("Import SysEx",nm,SHEET_IMPORT,NELEM(SHEET_IMPORT));return;}
-    if(k!=SK_PROJECT && bulk.on){sheet_open("Selected presets","USB SysEx / erase",SHEET_BULK,NELEM(SHEET_BULK));return;}
+    if(bulk.on){sheet_open("Selected presets","USB SysEx / erase",SHEET_BULK,NELEM(SHEET_BULK));return;}
     used = slot_row(k, r, tag, nm);
-    if (k == SK_PROJECT && r < 4u) {                    /* (the name as stored now, not the list's cached one) */
-        used = project_name(r, nm);
-        if (used && !nm[0])
-            str_cpy(nm, "Saved", 16);
-    }
-    if (used == 2) {
-        sl_do(2u);                                      /* (act_do: LOAD with NEW picked) */
-        return;
-    }
     str_cpy(t, tag, sizeof t);
     str_cpy(t + str_len(t), " \xB7 ", 4);
     str_cpy(t + str_len(t), used ? nm : "Empty", sizeof t - str_len(t));
-    if (k == SK_PROJECT && r + 1u == (uint32_t)PROJ_TMPL)
-        sheet_open(t, used ? "saved" : "empty", SHEET_TEMPLATE, NELEM(SHEET_TEMPLATE));
-    else if (k == SK_PROJECT)
-        sheet_open(t, used ? "saved" : "empty", SHEET_PROJECT, NELEM(SHEET_PROJECT));
-    else if (k == SK_USER)
+    if (k == SK_USER)
         sheet_open(t, used ? "used" : "empty", SHEET_USER, NELEM(SHEET_USER));
     else
         sheet_open(t, used ? "used" : "empty", SHEET_STORE, NELEM(SHEET_STORE));
@@ -161,9 +105,9 @@ static void slot_save_sheet(void)
 /* ----------------------------------------------------------- drawing --- */
 static void slot_draw(void)
 {
-    uint32_t k = slot_kind(), n = slot_count(k), cur = slot_cur(k), boot = k == SK_PROJECT ? slot_boot() : 0u;
+    uint32_t k = slot_kind(), n = slot_count(k), cur = slot_cur(k), boot = 0u;
     uint32_t vis = 1u + (uint32_t)((PV_SOUND_Y - 2 - SL_Y0 - SL_CARD) / SL_ROW), r, sig;
-    int32_t y, nx = 16 + text_w(&AF_S, k == SK_PROJECT ? "W" : "F000") + 10;   /* the names after the widest tag */
+    int32_t y, nx = 16 + text_w(&AF_S, "F000") + 10;   /* the names after the widest tag */
     char tag[6], nm[16];
     if (ui.force) {
         lcd_fill(0, H_HEAD, 240, PV_SOUND_Y - H_HEAD, T_BG);
@@ -203,7 +147,7 @@ static void slot_draw(void)
             y += SL_CARD;
         } else {
             cv_begin(240, SL_ROW, T_BG);
-            if(k!=SK_PROJECT && bulk_has(r))cv_rect(6,3,3,SL_ROW-6,T_THEME);
+            if(bulk_has(r))cv_rect(6,3,3,SL_ROW-6,T_THEME);
             cv_text_on(16, 5, &AF_S, tag, used ? T_MID : T_DIM, T_BG);
             cv_free_text(nx, 5, &AF_S, nm, used ? T_SEC : T_DIM, T_BG, boot == r + 1u ? 180 - nx : 220 - nx);
             if (boot == r + 1u)

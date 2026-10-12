@@ -773,52 +773,6 @@ static void test_cost(void)
 }
 
 /* ------------------------------------------------------------- demos --- */
-static void demo(const char *dir, const char *name, int rtype, int pluck)
-{
-    static const uint8_t PL[16] = {64, 0, 67, 0, 71, 0, 0, 74, 72, 0, 67, 0, 64, 0, 62, 0};
-    char path[512];
-    FILE *f;
-    uint32_t t, i, frames = 8u * FS;
-    int32_t o[2 * CTL];
-    track_t *tr = &trk[0];
-    memset(trk, 0, sizeof trk);
-    host_tracks_init();
-    rev_clear();
-    fx.rtype = (uint8_t)rtype;
-    song.g[G_RTYPE] = (int16_t)rtype;
-    song.g[G_BPM] = 100;
-    if (pluck) {
-        host_preset(tr, HOST_SYNTH, 9);                            /* CZ-1 ACO.GUITAR: a pluck */
-        for (i = 0; i < 16u; i++)
-            put_step(tr, i, PL[i] ? 1u : 0u, &PL[i], PL[i] ? ST_NOTE : ST_REST, 0);
-    } else {
-        host_808_kit(tr);                               /* the GM kit */
-        for (i = 0; i < 16u; i++) {
-            uint8_t dn[3], k = 0;
-            if (i % 4u == 0u || i == 10u) dn[k++] = 36;
-            if (i == 4u || i == 12u) dn[k++] = 38;
-            if (i % 2u == 0u) dn[k++] = 42;
-            put_step(tr, i, k, dn, k ? ST_NOTE : ST_REST, 0);
-        }
-    }
-    tr->p[P_REV] = 90;
-    tr->p[P_DLY] = tr->p[P_CHOR] = 0;
-    snprintf(path, sizeof path, "%s/%s.wav", dir, name);
-    if (!(f = fopen(path, "wb")))
-        return;
-    wav_hdr(f, frames);
-    transport_req = 1;
-    for (t = 0; t < frames; t += CTL) {
-        if (t == 6u * FS)
-            transport_req = 2;                                     /* the last 2 s: the tail alone */
-        mix_block(o, CTL);
-        for (i = 0; i < CTL; i++)
-            wav_put(f, o[2 * i], o[2 * i + 1]);
-    }
-    fclose(f);
-    printf("reverb: demo %s\n", path);
-}
-
 int main(int argc, char **argv)
 {
     test_room_identical();
@@ -827,11 +781,6 @@ int main(int argc, char **argv)
     test_clear();
     test_switch();
     test_cost();
-    if (argc > 1) {
-        demo(argv[1], "spring_drums", 1, 0);
-        demo(argv[1], "spring_pluck", 1, 1);
-        demo(argv[1], "room_drums", 0, 0);
-    }
     printf("%s\n", bad ? "REVERB TEST FAILED" : "reverb test passed");
     return bad != 0;
 }

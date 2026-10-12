@@ -22,7 +22,8 @@
 
 /* The Prophet user banks: 0x93000..0x9CFFF (the loader moved them from 0x89000 when the app area grew to 0x93000,
  * ldr_core.c), in the legacy single-pattern projects' place: those objects are retired (2026-10-10, Kerem: not
- * wanted), their numbers kept, nothing loads or saves them; 0x9D000..0x9EFFF is free.
+ * wanted), their numbers kept, nothing loads or saves them; 0x9D000..0x9EFFF: the synth build's last state
+ * (OBJ_SYNTH), which the main firmware never reads or writes.
  * Bank projects occupy 0xA0000..0xC7FFF, two five-sector copies per slot.
  * Expanded project copies each use two more sectors at 0xEA000..0xF9FFF (unused USR area).
  * User samples are disabled: this area must never accept sample uploads.
@@ -33,7 +34,7 @@
 /* Object numbers 0..19 stay fixed. U33..U64 use E5000..E8FFF;
  * owned FM6 U01..U32 reuse the old bank pair, U33..U64 use E9000/FA000.
  * E0000..E4FFF remains reserved for OTA loader staging. */
-enum { OBJ_SETTINGS, OBJ_PROJECT0, OBJ_UPRESET0 = OBJ_PROJECT0 + 4, OBJ_FM6BANK = OBJ_UPRESET0 + 2, OBJ_BANK0, OBJ_CZBANK0 = OBJ_BANK0 + 4, OBJ_UPRESET_EXT0 = OBJ_CZBANK0 + 8, OBJ_UPFM6_EXT = OBJ_UPRESET_EXT0 + 2, OBJ_NATIVEFM0, OBJ_P5BANK0 = OBJ_NATIVEFM0 + 2, OBJ_COUNT = OBJ_P5BANK0 + 5 };
+enum { OBJ_SETTINGS, OBJ_PROJECT0, OBJ_UPRESET0 = OBJ_PROJECT0 + 4, OBJ_FM6BANK = OBJ_UPRESET0 + 2, OBJ_BANK0, OBJ_CZBANK0 = OBJ_BANK0 + 4, OBJ_UPRESET_EXT0 = OBJ_CZBANK0 + 8, OBJ_UPFM6_EXT = OBJ_UPRESET_EXT0 + 2, OBJ_NATIVEFM0, OBJ_P5BANK0 = OBJ_NATIVEFM0 + 2, OBJ_SYNTH = OBJ_P5BANK0 + 5, OBJ_COUNT };
 
 typedef struct {
     uint32_t magic;
@@ -64,6 +65,8 @@ static uint32_t st_crc32(const void *p, uint32_t n)   /* zlib CRC-32, 4 bits per
 
 static uint32_t st_sector(uint32_t obj, uint32_t copy)  /* flash offset of copy A (0) / B (1) */
 {
+    if (obj == OBJ_SYNTH) return 0x9D000u + copy * ST_SECTOR;   /* the synth build's last state (persist.c), in the
+                                                                * free pair after the Prophet banks */
     if (obj >= OBJ_P5BANK0) return 0x93000u+(obj-OBJ_P5BANK0)*2u*ST_SECTOR+copy*ST_SECTOR;   /* (0x89000 before the app area
                                                                                                 * grew: the loader moved them) */
     if (obj >= OBJ_NATIVEFM0) return 0xD8000u + (obj - OBJ_NATIVEFM0) * 2u * ST_SECTOR + copy * ST_SECTOR;

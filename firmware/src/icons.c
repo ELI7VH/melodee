@@ -228,16 +228,10 @@ static uint32_t engine_icon(const char *name)
     return ICON_GENERIC;
 }
 
-/* MOTION: the knob and its trace; recording into it (REC armed on the selected track, playing): its REC form */
-static uint32_t motion_icon(void) { return rec_on(TSEL) ? ICON_X_MOTION_REC : ICON_X_MOTION; }
-
 /* the icon beside a page's title in the footer (the pages that have one of their own; else ICON_NONE) */
 static uint32_t page_icon(const page_t *pg)
 {
     switch (pg->graph) {
-    case GR_TRK: return ICON_X_MIXER;         /* MIXER (GLO): vertical faders */
-    case GR_SONG: return ICON_X_SONG;         /* SONG: the disc */
-    case GR_MOTION: return motion_icon();
     default: return ICON_NONE;
     }
 }

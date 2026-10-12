@@ -5,7 +5,7 @@
 enum { ED_UI_PALETTE = 1, ED_UI_FONT = 2, ED_UI_MONITOR = 4, ED_UI_FAVORITES = 8, ED_UI_RECORDING = 16, ED_UI_PERFORMANCE = 32 };
 static uint32_t ed_ui_caps(void)
 {
-    uint32_t caps = ED_UI_PALETTE | ED_UI_RECORDING | ED_UI_PERFORMANCE;
+    uint32_t caps = ED_UI_PALETTE | ED_UI_PERFORMANCE;
 #ifdef MELODEE_MONITOR
     caps |= ED_UI_MONITOR;
 #endif

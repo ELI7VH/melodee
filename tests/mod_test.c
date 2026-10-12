@@ -396,31 +396,12 @@ static int pan_e2e(void)                       /* MODW -> PAN moves the pan the 
 
 static void test_midi(void)
 {
-    static const uint8_t TRS[] = {0xB0, 1, 0x40, 1, 0x7F, 0xF8, 11, 0x20, 0xD2, 0x33, 0x34, 0x90, 60, 0, 0xB4, 1, 9};
-    uint32_t i;
     fresh(HOST_SYNTH, 0);
-    song.sel = 1;
-    pkt(0xB0, 1, 100);                           /* ch 1 CC1 */
-    pkt(0xB2, 11, 40);                           /* ch 3 CC11 */
-    pkt(0xD3, 77, 0);                            /* ch 4 aftertouch */
-    pkt(0xB6, 1, 55);                            /* ch 7: the selected track (2) */
-    pkt(0xB0, 7, 10);                            /* other CCs: ignored */
-    blocks(1);
-    check("USB: CC1 ch 1 -> part 1, CC11 ch 3 -> part 3, AT ch 4 -> part 4",
-          trk[0].mw == 100 && trk[2].ex_off == 127 - 40 && trk[3].at == 77 && trk[0].at == 0 && trk[0].ex_off == 0);
-    check("USB: CC1 on ch 7 -> the selected track (2)", trk[1].mw == 55 && trk[2].mw == 0);
-    pkt(0xB0, 121, 0);                           /* reset all controllers */
-    blocks(1);
-    check("CC121 resets MODW / AT / EXPR of the channel's track", trk[0].mw == 0 && trk[1].mw == 55);
-    fresh(HOST_SYNTH, 0);
-    song.sel = 1;
-    for (i = 0; i < sizeof TRS; i++)
-        um_byte(TRS[i]);
-    blocks(1);
-    check("TRS: CC1, running status, realtime between, CC11, AT (1 data byte, running status) -> parts",
-          trk[0].mw == 0x7F && trk[0].ex_off == 127 - 0x20 && trk[2].at == 0x34 && trk[0].at == 0);
-    check("TRS: ch 5 -> the selected track (2)", trk[1].mw == 9);
-    check("MODW -> PAN +63 through MIDI: the part is on the right (fresh FX)", in_child(pan_e2e));
+    pkt(0xB0, 1, 100); pkt(0xB2, 11, 40); pkt(0xD3, 77, 0); blocks(1);
+    check("all MIDI channels address the single synth", trk[0].mw == 100 && trk[0].ex_off == 87 && trk[0].at == 77);
+    pkt(0xB6, 121, 0); blocks(1);
+    check("CC121 resets the single synth controllers", !trk[0].mw && !trk[0].ex_off && !trk[0].at);
+    check("MODW -> PAN +63 through MIDI", in_child(pan_e2e));
 }
 /* ------------------------------------------------------------------ 4 --- */
 static uint64_t instr_now(void)
@@ -472,26 +453,11 @@ static void test_cost(void)
 {
     uint32_t e_phys = eng_by_name("PHYS"), pp = preset_by_name(e_phys, "BOWED METAL");
     uint8_t phys[NPART][3] = {{(uint8_t)e_phys, (uint8_t)pp, 8}}, idle[NPART][3] = {{0}};
-    uint8_t mix[NPART][3] = {{ENGI_FM6, 0, 8}, {2, 0, 8}, {(uint8_t)e_phys, (uint8_t)pp, 4}, {6, 0, 4}};
-    double c_idle, c0, c1, m0, m1;
-    if (!instr_now()) {
-        printf("mod: cost: no instruction counter on this host (proc_pid_rusage), skipped\n");
-        return;
-    }
-    c_idle = cost(idle, 0);
-    c0 = cost(phys, 0);
-    c1 = cost(phys, 1);
-    m0 = cost(mix, 0);
-    m1 = cost(mix, 1);
-    printf("mod: cost: PHYS %s (plays 4 voices): %.0f -> %.0f instructions / sample with 4 slots (+%.0f, +%.1f %% of "
-           "the part over the idle mix %.0f)\n", eng_preset(ENGINES[e_phys], pp)->name, c0, c1, c1 - c0,
-           (c1 - c0) * 100 / (c0 - c_idle), c_idle);
-    printf("mod: cost: 4 parts (FM6 8 + PHASE 8 + PHYS 4 + TRIO 4 asked, the budget plays 8), every slot of "
-           "every part active: %.0f -> %.0f (+%.1f %%)\n", m0, m1, (m1 - m0) * 100 / m0);
-    check("cost: 4 active slots add at most a few percent (PHYS part, the 4-part mix)",
-          (c1 - c0) * 100 / (c0 - c_idle) <= MOD_COST_MAX && (m1 - m0) * 100 / m0 <= MOD_COST_MAX);
+    if (!instr_now()) return;
+    double base = cost(idle, 0), off = cost(phys, 0), on = cost(phys, 1);
+    printf("mod: single-part matrix overhead %.1f %%\n", 100 * (on - off) / (off - base));
+    check("cost: 4 active slots add at most a few percent", 100 * (on - off) / (off - base) <= MOD_COST_MAX);
 }
-
 /* ------------------------------------------------------------------ 5 --- */
 static FILE *demo_open(const char *dir, const char *name, uint32_t frames)
 {

@@ -1,18 +1,22 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
 /* Complete musical archive: no raw addresses are accepted. Objects are staged
- * in main-loop RAM and fully validated before the existing A/B commit path writes.
- * Runtime and saved projects include all 32 pattern banks. Retired user sample
- * slots are absent from the inventory and cannot be restored over project data.
+ * in main-loop RAM and validated before the existing A/B commit path writes.
+ * The synth build has no runtime project (id 0: always empty); the main firmware's saved projects (ids 2..5) pass
+ * through as their flash objects, checked by the archive's CRC only, so a full archive restores them for the main
+ * firmware. Retired user sample slots are absent from the inventory and cannot be restored over project data.
  */
 #ifndef ED_BK_FLASH_PTR
 #define ED_BK_FLASH_PTR(off) fm1_xip_ptr(off)
 #endif
-static const uint8_t ED_BK_IDS[28] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27};
+static const uint8_t ED_BK_IDS[29] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28};
 #define ED_BK_N ((uint32_t)sizeof ED_BK_IDS)
-#define ED_BK_MAX ((uint32_t)sizeof proj_wire_u)
-#define ED_BK_RAW ((uint8_t *)&proj_wire_u)  /* reuse the existing serialized main-loop scratch */
-#define ed_bk_set set_rec    /* id 1: the settings record (+ the template), in the settings save's staging (project.c):
+static uint8_t ed_bk_buf[ST_BANK_BASE_MAX + ST_BANK_EXT_MAX] __attribute__((section(".pool"), aligned(4)));
+#define ED_BK_MAX ((uint32_t)sizeof ed_bk_buf)
+#define ED_BK_RAW ed_bk_buf                     /* the staging of an object (a saved project's the largest) */
+static synth_state_t ed_bk_synth __attribute__((section(".pool"))); /* id 28: current synth state */
+static uint8_t ed_bk_wire_gen;                  /* +1 whenever ED_BK_RAW is rewritten */
+#define ed_bk_set set_rec    /* id 1: the settings record (+ the template), in the settings save's staging (persist.c):
                              * a save while a backup runs rewrites it, and the archive's CRC then fails */
 static uint32_t ed_bk_set_len;
 static uint8_t ed_bk_valid, ed_bk_put, ed_bk_id, ed_bk_gen;
@@ -58,8 +62,9 @@ static const uint8_t *ed_bk_object(uint32_t id, uint32_t *len)
         }
     }
 #endif
+    if (id == 28u) { *len = sizeof ed_bk_synth; return (const uint8_t *)&ed_bk_synth; }
     if(id>=23u && id<=27u){p5_bank_t *b=p5_user_bank(id-23u);*len=sizeof *b;return (const uint8_t *)b;}
-    if (id == 0u) { *len = BANK_STORE_SIZE; return ED_BK_RAW; }
+    if (id == 0u) return ED_BK_RAW;                     /* no runtime project: always empty */
     if (id == 1u) { *len = ed_bk_set_len; return (const uint8_t *)&ed_bk_set; }
     if (id >= 2u && id <= 5u) {
         uint32_t slot = id - 2u;
@@ -73,12 +78,8 @@ static const uint8_t *ed_bk_object(uint32_t id, uint32_t *len)
         }
         return ED_BK_RAW;                   /* empty: a valid pointer, zero length */
 #else
-        if (bank_valid(proj_bank_slot[slot], BANK_STORE_SIZE) &&
-            !memcmp(proj_bank_slot[slot] + 8u, &proj_slot[slot], sizeof proj_slot[slot])) {
-            *len = BANK_STORE_SIZE; return proj_bank_slot[slot];
-        }
-        if (project_used(slot)) *len = sizeof proj_slot[slot];
-        return (const uint8_t *)&proj_slot[slot];
+        (void)slot;
+        return ED_BK_RAW;
 #endif
     }
     if (id == 6u || id == 7u || id == 17u || id == 18u) {
@@ -98,16 +99,15 @@ static const uint8_t *ed_bk_object(uint32_t id, uint32_t *len)
 static uint32_t ed_bk_capture(void)
 {
     if (ed_flash_stop()) return 3;
-    project_capture(&proj_scratch);
-    if (!bank_pack(ED_BK_RAW, &proj_scratch, 1)) return 2;
-    ed_bk_gen = ++proj_wire_gen;
+    state_capture(&ed_bk_synth);
+    ed_bk_gen = ++ed_bk_wire_gen;
 #if MELODEE_FLASH
     ed_bk_set.p = persist_saved;                    /* fields absent from this build survive */
 #else
     memset(&ed_bk_set.p, 0, sizeof ed_bk_set.p);
 #endif
-    settings_export(&ed_bk_set.p);                  /* the record as it is stored: the template (tmpl) after the settings */
-    ed_bk_set_len = sizeof ed_bk_set.p + (template_used() ? sizeof ed_bk_set.t : 0u);
+    settings_export(&ed_bk_set.p);                  /* the record as it is stored: the template (kept) after the settings */
+    ed_bk_set_len = sizeof ed_bk_set.p + tmpl_len;
     ed_bk_put = 0; ed_bk_valid = 1; ed_bk_usb = usb.resets;
     return 0;
 }
@@ -130,24 +130,13 @@ static uint32_t ed_bk_commit_inner(void)
     uint8_t *raw = ED_BK_RAW;
     uint32_t obj;
     if (ed_bk_pos != ed_bk_len || st_crc32(raw, ed_bk_len) != ed_bk_crc) return 2;
-    if (ed_bk_id == 0u || (ed_bk_id >= 2u && ed_bk_id <= 5u)) {
-        int full = bank_full(ed_bk_len);
-        if (ed_bk_len && !(full ? bank_valid(raw, ed_bk_len) : proj_import(&proj_scratch, raw, (int)ed_bk_len))) return 2;
-        if (ed_bk_id == 0u) {
-            if (!ed_bk_len) return 2;
-            if (project_restore_runtime(&proj_scratch)) return 2;
-            if (full) bank_restore(raw);
-            return 0;
-        }
-        if (ed_bk_len && !full) {
-            proj_bound(&proj_scratch); chain_defaults(&proj_scratch.chain);
-            if (!bank_pack(raw, &proj_scratch, 0)) return 2;
-            ed_bk_len = BANK_STORE_SIZE;
-        }
-        if (proj_write_slot(ed_bk_id - 2u, raw, ed_bk_len)) return 4;
-        if (proj_cur == ed_bk_id - 2u) proj_cur = PROJ_NO_SLOT;
-        sync_reload = 1; ui.force = 1;
-        return 0;
+    if (ed_bk_id == 28u) {
+        if (ed_bk_len && (ed_bk_len != sizeof(synth_state_t) || !state_valid((const synth_state_t *)raw))) return 2;
+        obj = OBJ_SYNTH;
+    } else if (ed_bk_id == 0u) {
+        return ed_bk_len ? 2u : 0u;                     /* (no runtime project: an empty one is all there is) */
+    } else if (ed_bk_id >= 2u && ed_bk_id <= 5u) {
+        obj = OBJ_BANK0 + ed_bk_id - 2u;                /* a saved project, as its flash object (the CRC checked it) */
     } else if (ed_bk_id == 1u) {
         const persist_t *p = (const persist_t *)raw;
         const uint8_t *t = raw + sizeof *p;                  /* a template after the settings */
@@ -197,18 +186,23 @@ static uint32_t ed_bk_commit_inner(void)
 #else
     (void)obj;
 #endif
-    if (ed_bk_id == 1u) {
+    if (ed_bk_id == 28u) {
+        syn_saved = 0; syn_retry = 0;
+        if (ed_bk_len) state_boot();
+        else { song.playing = 0; trk_all_off(TSEL); sound_init_of(TSEL, ENGI_PROPHET); }
+    } else if (ed_bk_id == 1u) {
         uint32_t ns = ed_bk_len > sizeof ed_bk_set.p ? sizeof ed_bk_set.p : ed_bk_len;
         memset(&ed_bk_set, 0, sizeof ed_bk_set);
         memcpy(&ed_bk_set.p, raw, ns);
         settings_import(&ed_bk_set.p, (int)ns);
         tmpl_take(raw + ns, ed_bk_len - ns);            /* (none in the backup: none now) */
-        tmpl_dirty = 0;
         settings_old_accept();
         panel_init(); settings_init(); palette_set(settings.palette);
 #if MELODEE_FLASH
         persist_saved = ed_bk_set.p; persist_pending = 0;
 #endif
+    } else if (ed_bk_id >= 2u && ed_bk_id <= 5u) {
+        /* (a saved project: the main firmware's; nothing of it in this build's RAM) */
     } else if(ed_bk_id>=9u && ed_bk_id<=16u){
         cz_bank_import(ed_bk_id-9u,raw,ed_bk_len);
         if(ed_bk_len)memcpy(native_cz_bank(ed_bk_id-9u),raw,sizeof(cz_bank_t));else {cz_bank_empty(native_cz_bank(ed_bk_id-9u),ed_bk_id-9u);native_cz_bank(ed_bk_id-9u)->ver=2;}
@@ -228,26 +222,27 @@ static uint32_t ed_bk_commit_inner(void)
 static uint32_t ed_bk_commit(void) { return ed_bk_commit_inner(); }
 static uint32_t ed_bk_write(const uint8_t *a, uint32_t n)
 {
-    if (n < 2u || a[0] > 3u || a[1] > 27u) return 1;
+    if (n < 2u || a[0] > 3u || a[1] > 28u) return 1;
     if (ed_flash_stop()) return 3;
     if (a[0] == 0u) {
         if (n != 12u || a[6] > 15u || a[11] > 15u) return 1;
         uint32_t len = ed_bk_r32(a + 2);
-        if (len > ED_BK_MAX || (a[1] == 0u && !bank_full(len) && len != sizeof(project_store_t)) ||
-            (a[1] == 1u && len != sizeof(persist_t) && len != sizeof ed_bk_set) ||
-            (a[1] >= 2u && a[1] <= 5u && len && !bank_full(len) && len != sizeof(project_store_t)) ||
+        if (len > ED_BK_MAX || (a[1] == 0u && len) ||
+            (a[1] == 1u && (len < sizeof(persist_t) || len > sizeof ed_bk_set)) ||
+            (a[1] >= 2u && a[1] <= 5u && len > ST_BANK_BASE_MAX + ST_BANK_EXT_MAX) ||
             ((a[1] == 6u || a[1] == 7u || a[1] == 17u || a[1] == 18u) && len && len != sizeof(up_bank_t)) ||
             (a[1] == 8u && len) ||
             (a[1]>=9u && a[1]<=16u && len && len!=sizeof(cz_bank_t)) ||
-            (a[1]>=23u && len && len!=sizeof(p5_bank_t)) ||
+            (a[1]>=23u && a[1]<=27u && len && len!=sizeof(p5_bank_t)) ||
+            (a[1]==28u && len && len!=sizeof(synth_state_t)) ||
             (a[1]>=19u && a[1]<=22u && len && len!=sizeof(native_fm_t))) return 1;
-        ed_bk_valid = 0; ed_bk_put = 1; ed_bk_id = a[1]; ed_bk_len = len; ed_bk_gen = ++proj_wire_gen;
+        ed_bk_valid = 0; ed_bk_put = 1; ed_bk_id = a[1]; ed_bk_len = len; ed_bk_gen = ++ed_bk_wire_gen;
         ed_bk_crc = ed_bk_r32(a + 7); ed_bk_pos = 0;
         ed_bk_usb = usb.resets; ed_bk_ms = fm1_ms;
         return 0;
     }
     if (!ed_bk_put || ed_bk_id != a[1] || ed_bk_usb != usb.resets || fm1_ms - ed_bk_ms > 15000u ||
-        ed_bk_gen != proj_wire_gen) {                 /* (a project save / load reused the staging RAM) */
+        ed_bk_gen != ed_bk_wire_gen) {                /* (another transfer reused the staging RAM) */
         ed_bk_put = 0; return 5;
     }
     ed_bk_ms = fm1_ms;
@@ -285,7 +280,7 @@ static int ed_backup_handle(uint32_t cmd, const uint8_t *a, uint32_t n)
         uint32_t len = 0, off = n >= 6u ? ed_bk_r32(a + 1) : 0u;
         uint32_t count = n == 8u ? (uint32_t)a[6] | (uint32_t)a[7] << 7 : 0u;
         const uint8_t *p = n ? ed_bk_object(a[0], &len) : 0;
-        uint32_t rc = (!ed_bk_valid || ed_bk_usb != usb.resets || (n && !a[0] && ed_bk_gen != proj_wire_gen)) ? 5u : transport_busy() ? 3u :
+        uint32_t rc = (!ed_bk_valid || ed_bk_usb != usb.resets || (n && !a[0] && ed_bk_gen != ed_bk_wire_gen)) ? 5u : transport_busy() ? 3u :
             n != 8u || a[5] > 15u || !p || !count || count > 256u || off > len || count > len - off ? 1u : 0u;
         uint32_t data_off = off;
 #if MELODEE_FLASH

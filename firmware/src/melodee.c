@@ -25,7 +25,7 @@
 #endif
 #ifndef MELODEE_USB_AUDIO
 #define MELODEE_USB_AUDIO 1      /* USB audio (usb_audio.c): "Melodee Out" plays through the FM-1, "Melodee In"
-                                  * records the four tracks; 16 / 24 bit, 44.1 kHz. Needs EP2 / EP3: no CDC */
+                                  * records the stereo synth master; 16 / 24 bit, 44.1 kHz. Needs EP2 / EP3: no CDC */
 #endif
 #ifndef MELODEE_CDC
 #define MELODEE_CDC !MELODEE_USB_AUDIO   /* USB CDC-ACM serial console */
@@ -37,7 +37,7 @@
 #define MELODEE_ID "FM-1_900"    /* package identity (build.py: the .fwsc marker string) */
 #endif
 #ifndef MELODEE_VERSION
-#define MELODEE_VERSION "v1.2.1" /* shown in the menu, the console and the editor; build.py --release X.Y[.Z] */
+#define MELODEE_VERSION "synth-dev" /* shown in the menu, the console and the editor; build.py --release X.Y[.Z] */
 #endif
 #if MELODEE_OTA && !MELODEE_FLASH
 #error "MELODEE_OTA needs MELODEE_FLASH"
@@ -76,14 +76,13 @@
 #include "slicer.c"              /* per-track SLICER insert, used by fx.c */
 #include "fx.c"
 
-/* ------------------------------------------------- MIDI, sequencer --- */
+/* ------------------------------------------------------ MIDI, keys --- */
 #define MIDI_TIME_NOW() fm1_ticks()
 #define MIDI_TICKS_PER_MS (1000u * FM1_TICKS_PER_US)
 #include "usb.c"
 #if MELODEE_UART
 #include "midi_uart.c"
 #endif
-#include "song_chain.c"
 #include "seq.c"
 #include "audio.c"
 
@@ -104,11 +103,10 @@
 #include "storage.c"
 #endif
 #include "upreset.c"             /* user presets (RAM mirror; flash with MELODEE_FLASH) */
-#include "project.c"
+#include "persist.c"               /* the settings record, the last state */
 #include "cz_store.c"
 #include "fm6_store.c"            /* FM6: DX7 SysEx, the STORE shortcut to user presets */
 #if MELODEE_OTA
-#define OTA_SCRATCH proj_wire_borrow()   /* the update entry stages in the project staging RAM */
 #include "ota.c"
 #include "ota_hw.c"
 #include "editor.c"              /* web editor SysEx (needs the OTA SysEx plumbing) */

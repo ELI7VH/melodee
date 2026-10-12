@@ -51,12 +51,13 @@ enum { PF_R8, PF_R16, PF_R32, PF_REV, PF_LPF, PF_HPF, PF_TAPE, PF_FRZ, PF_OUP, P
 #define PF_BUF (PF_REPEAT | PF_BIT(PF_REV) | PF_BIT(PF_TAPE) | PF_BIT(PF_FRZ) | PF_HARM)
 #define PF_MUTE (((1u << NTRK) - 1u) << PF_M1)
 #define PF_MOD (PF_BIT(PF_FLG) | PF_BIT(PF_PHS))   /* FLANGER, PHASER: their own stages after CRUSH */
-#define PB_FRAMES (NTRK * SL_LEN / 2u)        /* stereo frames in sl_buf: 8192, 371 ms at 22.05 kHz */
+#define PB_FRAMES 8192u                     /* stereo frames: fixed 371 ms at 22.05 kHz, regardless of tracks */
 #define PB_MAX (2u * PB_FRAMES)               /* the longest loop, 44.1 kHz samples */
 #define PB_TAPE 32000u                        /* TAPE STOP takes 1 beat, at most this (it lags a quarter of it) */
 #define PB_FREC 4096u                         /* FREEZE: frames it records (186 ms) */
 #define PB_GRAIN 2048u                        /* .. its two overlapping grains, samples (46 ms) */
 #define HB_MASK 4095u                         /* OCT UP / DN: the delay's frames (of the loop's 8192) */
+_Static_assert(HB_MASK + 1u <= PB_FRAMES && PB_FREC <= PB_FRAMES, "FX taps fit the stereo loop");
 #define HB_BASE 128u                          /* .. the taps' shortest delay, samples; the sweep: 2048 */
 #define HB_FB 269                             /* .. KNOB 4 (0 .. 100) -> the shimmer, Q15: 0 .. 0.82 */
 #define PF_TOP (63 << 8)                      /* filter cutoff index, Q8 (PF_SVF): the LPF's open end */
@@ -135,7 +136,7 @@ static struct {
     int32_t fw, pw;                    /* their shares, Q15 */
     uint32_t fwp, fn;                  /* FLANGER: the frame written next; frames written since it started */
     int32_t px[2][PH_ST], py[2][PH_ST], pfb[2];   /* PHASER: each stage's last input and output, L and R; the fed back */
-} pf = {.src = PF_N, .next = PF_N, .lc = PF_TOP, .mg = {32768, 32768, 32768, 32768}};
+} pf = {.src = PF_N, .next = PF_N, .lc = PF_TOP, .mg = {[0 ... NTRK - 1] = 32768}};
 
 static int16_t fl_buf[FL_LEN][2];      /* FLANGER's line: L R, at half the level (headroom) */
 
@@ -223,7 +224,7 @@ static void perf_buf_start(uint32_t e)
         for (uint32_t k = 0; k < NTRK; k++) {
             resource_release(RES_SLICER0 + k); sl_buf[k] = 0;
         }
-        perf_audio = resource_get(RES_PERFORM, NTRK * SL_LEN * sizeof(int16_t));
+        perf_audio = resource_get(RES_PERFORM, 2u * PB_FRAMES * sizeof(int16_t));
         if (!perf_audio) { sl_lent = 0; pf.src = pf.next = PF_N; pf.mode = BM_NONE; return; }
     }
     pf.src = (uint8_t)e;

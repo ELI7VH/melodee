@@ -1,4 +1,10 @@
-# Building Melodee
+# Building Melodee Synth
+
+This checkout is the `synth-only` branch: one synth track, restored effects and stereo USB capture.
+The default package is `build/melodee-synth.fwsc` (`synth-dev`, development identity `FM-1_900`).
+Run `tests/run_tests.sh` for this branch's synth-only host suite. Historical four-track and project
+examples farther below describe the main firmware; the [README](README.md) lists this branch's controls.
+
 
 The build makes three files in `build/`:
 
@@ -6,7 +12,7 @@ The build makes three files in `build/`:
 | --- | --- |
 | `melodee.bin` | the firmware app |
 | `loader/ota.bin` | the update loader |
-| `melodee.fwsc` | the installable package (app + loader) |
+| `melodee-synth.fwsc` | the installable package (app + loader) |
 
 ## Prerequisites (macOS)
 
@@ -158,7 +164,7 @@ Use the web installer in Chrome or Edge:
 From the command line (needs `pip3 install mido python-rtmidi`):
 
 ```
-python3 tools/fm1_install.py build/melodee.fwsc
+python3 tools/fm1_install.py build/melodee-synth.fwsc
 python3 tools/fm1_install.py --info          # identity of the connected FM-1
 ```
 

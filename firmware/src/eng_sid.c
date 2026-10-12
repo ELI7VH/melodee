@@ -378,9 +378,9 @@ static void sid_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const v
         } else                                         /* OFF: no voice routed to the filter */
             f = (soft_knee((x * gin) >> 12, knee) * gout) >> 12;
         xlp += (int32_t)(((int64_t)(clamp(f, -131071, 131071) - xlp) * SID_XLP_A) >> 15);
-        xhp += (int32_t)(((int64_t)((xlp << 8) - xhp) * SID_XHP_A) >> 16);
+        xhp += (int32_t)(((int64_t)(xlp * 256 - xhp) * SID_XHP_A) >> 16);
         o = clamp(xlp - (xhp >> 8), -32767, 32767);
-        out[i] += voice_amp(o << 1, m, i);             /* (one voice peaks near half scale) */
+        out[i] += voice_amp(o * 2, m, i);             /* (one voice peaks near half scale) */
     }
     for (k = 0; k < 3u; k++) {
         v->ph[k] = ph[k];
