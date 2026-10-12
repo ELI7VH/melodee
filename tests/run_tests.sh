@@ -94,7 +94,7 @@ synth_ui() {
     build synth_ui_render synth_ui_render -O1 $FW || return
     step "all synth UI pages, palettes and FM6 algorithms" "$OUT/synth_ui_render" build/ui_synth
     if [ "$PIL" = 1 ]; then
-        step "HOME knob cards match the established design" python3 tools/ui_mockcmp.py build/ui_synth build/ui_synth_home_mock \
+        step "HOME knobs dropped in match the established design" python3 tools/ui_mockcmp.py build/ui_synth build/ui_synth_home_mock \
             --screens stage_p5_knobs --crop 0 22 240 66 --min 60
         step "retained UI beside the approved mockups" python3 tools/ui_mockcmp.py build/ui_synth build/ui_synth_mock \
             --screens browser env lfo edit_osc fx dly settings sheet_sound picker_wave sections_p5 map_p5 map_fm6 \

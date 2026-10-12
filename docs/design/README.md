@@ -36,19 +36,23 @@ Texts differ on purpose (the device's own sound names): the targets leave room f
 
 ## Synth-only HOME
 
-The single-instrument build uses the established `stage_note_overlay` layout: four permanent 54 x 44 knob
-cards at y 22, the chord and its notes on separate lines over the smooth waveform, and the selected sound's
-rounded, outlined lane. The scope begins at the same y 70 and grows to 124 pixels; the sound lane at y 198
-and a quiet playing-status row at y 219 occupy the former additional track lanes. Effects use their existing
-pages and held FX layer. The full-width title, status pills and five effect rings are retired.
+The single-instrument build draws its one sound as Stage's columns draw a track (`concept_stage_columns`), across the
+screen: under the header, the sound's card (x 4..236, y 22..122) with the bar and the category in the theme's
+colour, the place of the sound at the right (`34 / 201`, `U07`, `P012`), the name as large as it fits (Rubik 30 px
+on one line, else on two lines that take the engine's row, else 15 px), the engine under a one-line name, and four
+pills of what plays the keys (the ARP's mode, HOLD, CHORD, the scale) in the lights' grammar: filled happening now,
+outlined and dim there to turn on. Under the card, the panel (y 126..238): the chord and the notes played on one
+line at its top (`stage_held`'s line), the smooth waveform in the band under them, dimmed while they are held (no
+note played yet: the waveform over the whole panel). A knob turned drops the engine's four knobs over the card's
+top (`stage_dropping`, `stage_cutoff`) and the band shows what the knob shapes, its value at the right; the card is
+whole again ST_KNOB_MS after the last turn. The effects keep their pages and the held FX layer.
 
-`tests/synth_ui_render.c` renders the retained reference states on the single track, using the mockups' amber
-accent for comparison and coral for the actual HOME preview. The host suite writes comparisons to
-`build/ui_synth_mock`. These report parity with the historical mockups; they do not impose a new score gate
-on evolved native engine controls or the removal of the three other tracks. The permanent HOME knob-card
-region is checked against `stage_p5_knobs` with a parity floor of 60 (native labels and value formats differ);
-this rejects the replacement dashboard. Layout lint still rejects clipping and overlap. The sound-page layouts
-were also compared against the pre-synth branch at `cd4f94e`.
+`tests/synth_ui_render.c` renders the reference states on the single track (the mockups' amber accent for the
+comparison, coral for `synth_home` and `synth_home_playing`), every factory sound of every engine on Stage under the
+layout lint (the name never cut or spilling; `stage_name_e<N>`: each engine's longest), and every scale with every
+ARP mode on the card's pills. The host suite writes the comparisons to `build/ui_synth_mock`; the knobs dropped
+in (`stage_p5_knobs`, rows 22..66) are checked against the mockup with a parity floor of 60 (the device's labels
+and value formats differ). The sound pages keep the main firmware's layouts.
 
 ## Tokens (from the mockups' code)
 

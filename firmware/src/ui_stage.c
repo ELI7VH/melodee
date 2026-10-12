@@ -1,17 +1,27 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* HOME follows the approved Stage note-overlay design: the four knob cards,
- * a smooth waveform with the chord and notes over it, and the selected sound
- * lane. A single instrument leaves room for a taller scope and one quiet row
- * of playing status; FX retain their existing pages and held layer. */
-#define ST_PANEL_Y Y_GRAPH
-#define ST_PANEL_H 124
-#define ST_SOUND_Y (ST_PANEL_Y + ST_PANEL_H + 4)
-#define ST_STATUS_Y (ST_SOUND_Y + 21)
-#define ST_KNOB_MS 1500u
-_Static_assert(240u * ST_PANEL_H <= CV_MAX, "HOME scope must fit the drawing canvas");
+/* Melodee's Stage (HOME) in the synth build: the one sound, drawn as Stage's columns draw a track, across the screen
+ * (docs/design: concept_stage_columns, stage_note_overlay). Under the header, the sound's card: the bar and the
+ * category in the theme's colour, the name large (Rubik 30 px when it fits, else two lines of 15 px), the engine and
+ * where the sound comes from, and the four pills of what plays the keys (the ARP's mode, HOLD, CHORD, the scale) in the
+ * lights' grammar: filled happening now, outlined and dim there to turn on. Under the card the panel: the chord and
+ * notes played in front of the smooth waveform, dimmed while held. The first turn of a knob drops the four knobs (the
+ * engine's, stage_page) over the card's top (ST_DROP frames) and the panel shows what the knob shapes and its value;
+ * ST_KNOB_MS after the last turn they go and the card is whole again. The card redraws when what it shows changes;
+ * the panel follows the scope every other frame, drawn last (the SPI sends it while the next frame is worked out). */
+#define ST_CARD_X 4                                     /* the sound's card: x 4 .. 236, y 22 .. 122 */
+#define ST_CARD_Y Y_LABEL
+#define ST_CARD_W 232
+#define ST_CARD_H 100
+#define ST_PANEL_Y (ST_CARD_Y + ST_CARD_H + 4)          /* the panel: y 126 .. 238 */
+#define ST_PANEL_H (238 - ST_PANEL_Y)
+#define ST_KNOB_MS 1500u                                /* the knobs stay this long after the last turn */
+#define ST_DROP 4u                                      /* .. and drop in over this many frames */
+_Static_assert(240u * ST_PANEL_H <= CV_MAX, "the panel fits a canvas");
 
 static struct {
-    uint32_t knob_ms;                                   /* last HOME knob turn, for the response picture */
+    uint32_t card;                                      /* the card's drawn state */
+    uint32_t knob_ms;                                   /* the last knob turn on Stage (| 1), 0 none */
+    uint8_t out, drop;                                  /* the knobs out; frames still dropping */
 } stage;
 
 static void stage_knob_touch(void) { stage.knob_ms = fm1_ms | 1u; }   /* (ui_input.c: a knob on Stage) */
@@ -34,7 +44,7 @@ static void stage_value(const page_t *sp, const param_desc_t *d, int32_t v, char
     }
     param_format(d, v, val, unit);
 }
-/* The four cards stay visible: labels and values use the established Stage typography. */
+/* the four cards (while the knobs are out): a value without effect on the sound as it is drawn dim */
 static void stage_columns(void)
 {
     const page_t *sp = stage_page();
@@ -81,7 +91,7 @@ static void stage_wave(uint16_t c, int32_t top, int32_t h)
 }
 
 /* the notes the selected track played (live_last: its last voicing, held or let go), the chord they make, in front of
- * what is on the canvas (cv_over): the root and quality on the first line, notes on the second.
+ * what is on the canvas (cv_over): the root 30 px, its quality 15 px, then the notes 11 px, on one baseline (38).
  * Held: the chord in text, the notes in the track's colour; let go: both faded into the panel. 0 none, 1 let go, 2 held */
 static int stage_notes(int32_t x1)
 {
@@ -90,7 +100,7 @@ static int stage_notes(int32_t x1)
     char b[48];
     const char *q;
     uint16_t c, cn;
-    int32_t x;
+    int32_t x = 10;
     fm1_irq_off();                                      /* one coherent ISR snapshot, nothing drawn meanwhile */
     for (i = 0; i < 4u; i++) {
         bits[i] = live_last[k][i];
@@ -109,22 +119,16 @@ static int stage_notes(int32_t x1)
     bass = note[0] % 12u;
     q = micro_active(TSEL) ? 0 : chord_of(pcs, bass, &root);
     if (q) {
-        x = cv_text(10, 1, &AF_L, N_NOTE[root], c);
-        x = cv_text(x + 1, 15, &AF_M, q, c);
+        x = cv_text(x, 9, &AF_L, N_NOTE[root], c);
+        x = cv_text(x + 1, 23, &AF_M, q, c);
         if (root != bass) {
-            x = cv_text(x + 3, 1, &AF_L, "/", c);
-            cv_text(x, 1, &AF_L, N_NOTE[bass], c);
+            x = cv_text(x + 3, 9, &AF_L, "/", c);
+            x = cv_text(x, 9, &AF_L, N_NOTE[bass], c);
         }
-        notes_fit(b, note, n, &AF_S, x1 - 10);
-        cv_text(10, 39, &AF_S, b, cn);
-    } else {
-        const aafont_t *f = &AF_L;
-        if (notes_fit(b, note, n, f, x1 - 10) != n) {
-            f = &AF_S;
-            notes_fit(b, note, n, f, x1 - 10);
-        }
-        cv_text(10, f == &AF_L ? 1 : 15, f, b, c);
+        x += 10;
     }
+    notes_fit(b, note, n, &AF_S, x1 - x);
+    cv_text(x, 27, &AF_S, b, cn);
     return (int)(1u + (held != 0u));
 }
 /* HOME's notes alone (tests/ui_test.c): 1 = there were notes */
@@ -173,11 +177,12 @@ static uint32_t stage_picture(int32_t *v)
         return SP_FILTER;
     }
 }
-/* a low-pass response: flat, the resonance's peak at the cutoff (a dotted line), then the slope; cut, res 0..127 */
+/* a low-pass response: flat, the resonance's peak at the cutoff (a dotted line), then the slope; cut, res 0..127. In
+ * the band from cv_oy + 3 down to the panel's foot */
 static void stage_filter(int32_t cut, int32_t res, uint16_t c)
 {
     int32_t x, fc = 10 + clamp(cut, 0, 127) * 200 / 127, peak = clamp(res, 0, 127) * 14 / 127;
-    int32_t top = 3, bot = ST_PANEL_H - 4, y0 = 22 * 16, py = 0;
+    int32_t top = 3, bot = ST_PANEL_H - 6 - cv_oy, y0 = 22 * 16, py = 0;
     for (x = top; x < bot; x += 5)
         cv_rect(fc, x, 1, 2, ux_mix(T_PANEL, c, 60));
     for (x = 0; x < 220; x++) {
@@ -188,27 +193,37 @@ static void stage_filter(int32_t cut, int32_t res, uint16_t c)
     }
 }
 
+/* the panel: the chord and notes played on a line at its top (none played yet: nothing there), the waveform in the
+ * band under them (none played: the whole panel), dimmed while they are held; a knob turning: what it shapes in that
+ * band and its value at the top right */
+#define ST_TEXT_H 44                                    /* the chord's line: the panel's rows 0 .. 43 */
 static void stage_panel(void)
 {
-    uint32_t sel = song.sel % NTRK, pic, i;
-    int32_t pv[4];
+    uint32_t sel = song.sel % NTRK, pic, i, any = 0;
+    int32_t pv[4], top;
     int held = 0;
     cv_begin(240, ST_PANEL_H, T_BG);
     cv_rrect(4, 0, 232, ST_PANEL_H, 6, T_PANEL, T_BG);
     cv_bg = T_PANEL;
     fm1_irq_off();
-    for (i = 0; i < 4u; i++) held |= live_held[sel][i] != 0u;
+    for (i = 0; i < 4u; i++) {
+        held |= live_held[sel][i] != 0u;
+        any |= live_last[sel][i];
+    }
     fm1_irq_on();
     pic = stage_picture(pv);
-    /* behind: the waveform (dimmed while notes are held), or what the knob turning shapes */
-    if (pic == SP_FILTER)
+    top = any || pic ? ST_TEXT_H : 6;                   /* the band behind: under the chord's line */
+    if (pic == SP_FILTER) {
+        cv_oy = top - 3;
         stage_filter(pv[0], pv[1], ux_mix(T_PANEL, T_THEME, 55));
-    else if (pic == SP_ENV)
-        graph_adsr_v(pv[0], pv[1], pv[2], pv[3], 4, ST_PANEL_H - 8, ux_mix(T_PANEL, T_THEME, 55));
-    else
-        stage_wave(held ? ux_mix(T_PANEL, T_THEME, 40) : T_THEME, 4, ST_PANEL_H - 8);
+        cv_oy = 0;
+    } else if (pic == SP_ENV) {
+        graph_adsr_v(pv[0], pv[1], pv[2], pv[3], top, ST_PANEL_H - 8, ux_mix(T_PANEL, T_THEME, 55));
+    } else {
+        stage_wave(held ? ux_mix(T_PANEL, T_THEME, 40) : T_THEME, top, ST_PANEL_H - 6 - top);
+    }
     cv_over = 1;                                        /* in front: blended over it */
-    stage_notes(pic ? 176 : 228);
+    stage_notes(pic ? 168 : 228);
     if (pic) {                                          /* the value turning, at the top right */
         int16_t *vp;
         const char *unit;
@@ -218,72 +233,176 @@ static void stage_panel(void)
         if (d && vp) {
             stage_value(sp, d, *vp, val, &unit);
             str_cpy(val + str_len(val), unit, 4);
-            cv_text_r(228, 4, &AF_M, val, T_THEME, T_PANEL);
+            cv_text_r(226, 12, &AF_M, val, T_THEME, T_PANEL);
         }
     }
     cv_over = 0;
     cv_blit(0, ST_PANEL_Y);
 }
 
-/* ------------------------------------------------------- sound / status --- */
-static void stage_sound(void)
+/* ------------------------------------------------------- the card --- */
+/* the sound's name as large as it fits: 30 px on one line (rows 16 .. 52), else 30 px on two (cut at the last space,
+ * '.' or '-' that fits; rows 12 .. 78, over the engine's row: the header chip names it), else 15 px, free text.
+ * 1: two lines */
+static int stage_name(const char *s, uint16_t c, uint16_t bg)
 {
-    char nm[16], tag[6];
-    uint32_t src, kk;
+    char a[24], b[24];
+    uint32_t i, cut = 0;
+    const int32_t w = ST_CARD_W - 20;
+    if (text_w(&AF_L, s) <= w) {
+        cv_text_on(10, 16, &AF_L, s, c, bg);
+        return 0;
+    }
+    for (i = 0; s[i] && i < 22u; i++)                   /* (cut: the first line's length; a space goes) */
+        if (s[i] == ' ' || s[i] == '.' || s[i] == '-') {
+            uint32_t n = i + (s[i] != ' ');
+            str_cpy(a, s, n + 1u);
+            if (n && text_w(&AF_L, a) <= w) cut = n;
+        }
+    if (cut) {
+        str_cpy(a, s, cut + 1u);
+        str_cpy(b, s + cut + (s[cut] == ' '), sizeof b);
+        if (text_w(&AF_L, b) <= w) {
+            cv_text_on(10, 12, &AF_L, a, c, bg);
+            cv_text_on(10, 42, &AF_L, b, c, bg);
+            return 1;
+        }
+    }
+    cv_free_text(10, 28, &AF_M, s, c, bg, w);
+    return 0;
+}
+/* a pill at x on row y, at most maxw wide: on, filled in c; off, outlined and dim (the lights' grammar). Its right edge
+ * + 4. A name that does not fit is free text (ellipsised: a scale's) */
+static int32_t stage_pill(int32_t x, int32_t y, const char *s, int on, uint16_t c, uint16_t bg, int32_t maxw)
+{
+    int32_t w = text_w(&AF_X, s) + 12, fill = on ? c : bg, ink = on ? T_INK : T_DIM;
+    if (w > maxw)
+        w = maxw;
+    if (on) {
+        cv_rrect(x, y, w, 16, 5, c, bg);
+    } else {
+        cv_rrect(x, y, w, 16, 5, T_LINE, bg);
+        cv_rrect(x + 1, y + 1, w - 2, 14, 4, bg, T_LINE);
+    }
+    if (text_w(&AF_X, s) + 12 > maxw)
+        cv_free_text(x + 6, y + 2, &AF_X, s, (uint16_t)ink, (uint16_t)fill, w - 12);
+    else
+        cv_text_c(x + w / 2, y + 2, &AF_X, s, (uint16_t)ink, (uint16_t)fill);
+    return x + w + 4;
+}
+static void stage_card(void)
+{
+    static const char *const AM[7] = {"ARP", "ARP UP", "ARP DN", "ARP UPDN", "ARP RND", "ARP ORD", "REPEAT"};
+    const track_t *t = TSEL;
+    uint32_t src, kk, cat, sig, amode = (uint32_t)clamp(t->p[P_AMODE], 0, 6);
+    uint32_t hold = t->p[P_AHOLD] != 0, chord = t->p[P_CHRD] != 0, qnt = t->p[P_QUANT] != Q_OFF;
     int pending = browse_pending();
-    uint16_t tc = TSEL->p[P_MUTE] ? T_DIM : T_THEME;
-    if (pending) {
-        src = browse_shown(&kk); entry_label(src, kk, tag, nm);
+    uint16_t tc = t->p[P_MUTE] ? T_DIM : T_THEME, bg = T_PANEL;
+    char nm[24], tag[8], where[16], scl[16];
+    const char *en;
+    int two = 0;
+    if (pending) {                                      /* browsing: the sound the list shows, not yet loaded */
+        src = browse_shown(&kk);
+        entry_label(src, kk, tag, nm);
         if (!nm[0]) str_cpy(nm, tag, sizeof nm);
     } else {
-        trk_short_name(0, nm);
-        if (TSEL->eng_req == ENGI_PROPHET) p5_short_name(TSEL, nm, sizeof nm);
+        sound_name(t, nm);
+        if (!nm[0]) str_cpy(nm, ENGINES[eng_idx(t->eng_req)]->name, sizeof nm);
         cur_entry(&src, &kk);
     }
-    cv_begin(240, 19, T_BG);
-    cv_rrect(4, 0, 232, 19, 5, tc, T_BG);
-    cv_rrect(5, 1, 230, 17, 4, T_RAISE, tc);
-    cv_rect(7, 4, 2, 11, tc);
-    cv_free_text(14, 3, &AF_S, nm, pending ? T_ACCENT : T_TEXT, T_RAISE, 166);
-    cv_text_r(227, 4, &AF_X, CAT_NAME[entry_cat(src, kk) % CAT_N], tc, T_RAISE);
-    cv_blit(0, ST_SOUND_Y);
-}
-static void stage_status(void)
-{
-    static const char *const AM[7] = {"ARP OFF", "ARP UP", "ARP DOWN", "ARP UP/DN", "ARP RANDOM", "ARP ORDER", "REPEAT"};
-    uint32_t mode = (uint32_t)clamp(TSEL->p[P_AMODE], 0, 6);
-    int32_t x;
-    char scale[32];
-    cv_begin(240, 19, T_BG);
-    x = cv_text(8, 3, &AF_X, AM[mode], mode ? T_THEME : T_DIM);
-    if (TSEL->p[P_AHOLD]) x = cv_text(x + 8, 3, &AF_X, "HOLD", T_THEME);
-    if (TSEL->p[P_CHRD]) x = cv_text(x + 8, 3, &AF_X, "CHORD", T_THEME);
-    if (TSEL->p[P_QUANT] != Q_OFF) {
-        str_cpy(scale, N_NOTE[(uint32_t)TSEL->p[P_ROOT] % 12u], 4);
-        str_cpy(scale + str_len(scale), " ", 2);
-        str_cpy(scale + str_len(scale), N_SCALE[clamp(TSEL->p[P_SCALE], 0, SCALE_TOTAL - 1u)], 24);
-        char fitted[32];
-        text_fit(fitted, sizeof fitted, scale, &AF_X, 232 - x - 8);
-        cv_free_text(232 - text_w(&AF_X, fitted), 3, &AF_X, scale, T_MID, T_BG, 232 - x - 8);
+    en = ENGINES[eng_idx(src_engine(src, kk))]->name;
+    if (src_slot(src)) {                                /* a user or native slot: its tag ("U07", "P012") */
+        char n2[24];
+        entry_label(src, kk, where, n2);
+    } else {                                            /* a factory sound: its place in the engine's ("12 / 200") */
+        uint32_t np = ENGINES[eng_idx(src)]->npresets;
+        fmt_int(where, (int32_t)(kk % (np ? np : 1u)) + 1);
+        str_cpy(where + str_len(where), " / ", 4);
+        fmt_int(where + str_len(where), (int32_t)np);
     }
-    cv_blit(0, ST_STATUS_Y);
+    cat = entry_cat(src, kk) % CAT_N;
+    if (qnt) {                                          /* the keys in a scale: its root and name ("C MIN") */
+        str_cpy(scl, N_NOTE[(uint32_t)t->p[P_ROOT] % 12u], 4);
+        str_cpy(scl + str_len(scl), " ", 2);
+        str_cpy(scl + str_len(scl), N_SCALE[clamp(t->p[P_SCALE], 0, (int32_t)NELEM(N_SCALE) - 1)], 10);
+    } else {
+        str_cpy(scl, "SCALE", sizeof scl);
+    }
+    sig = str_hash(str_hash(str_hash(str_hash(1u + (uint32_t)pending * 16u + stage.out * 32u + t->p[P_MUTE] * 64u, nm),
+                   en), where), scl) + cat * 61u + amode * 7919u + hold * 131u + chord * 613u + qnt * 1291u +
+          ux.gen * 977u + ux.pal * 31u;
+    if (!ui.force && sig == stage.card)
+        return;
+    stage.card = sig;
+    cv_begin(ST_CARD_W, ST_CARD_H, T_BG);
+    cv_rrect(0, 0, ST_CARD_W, ST_CARD_H, 6, bg, T_BG);
+    if (!stage.out) {                                   /* (under the knobs, while they are out: not drawn) */
+        cv_rect(3, 0, ST_CARD_W - 6, 3, tc);            /* the bar */
+        cv_text_on(10, 5, &AF_X, cat && cat != CAT_OTHER ? CAT_NAME[cat] : "SOUND", tc, bg);
+        cv_text_r(ST_CARD_W - 10, 5, &AF_X, where, T_MID, bg);
+        two = stage_name(nm, pending ? T_ACCENT : t->p[P_MUTE] ? T_DIM : T_TEXT, bg);
+    }
+    if (!two)
+        cv_text_on(10, 60, &AF_X, en, T_MID, bg);       /* the engine (two lines of name: the header chip's) */
+    {   /* what plays the keys */
+        int32_t x = 10, r = ST_CARD_W - 10;
+        x = stage_pill(x, 80, AM[amode], amode != 0u, tc, bg, r - x);
+        x = stage_pill(x, 80, "HOLD", (int)hold, tc, bg, r - x);
+        x = stage_pill(x, 80, "CHORD", (int)chord, tc, bg, r - x);
+        (void)stage_pill(x, 80, scl, (int)qnt, tc, bg, r - x);
+    }
+    if (stage.out)                                      /* the knobs over the top: the rows under them only */
+        cv_blit_from(ST_CARD_X, ST_CARD_Y, CARD_H);     /* (two lines of name: their second shows under them) */
+    else
+        cv_blit(ST_CARD_X, ST_CARD_Y);
 }
 
+/* the knobs: out while one turns (and ST_KNOB_MS after), dropping in over ST_DROP frames (each its cards' bottom rows,
+ * more each frame: the card under them does not redraw); gone at once, the card whole again */
+static void stage_knobs(void)
+{
+    int out = stage_knob_active();
+    if (out && !stage.out) {
+        stage.out = 1;
+        stage.drop = ST_DROP;
+    } else if (!out && stage.out) {
+        stage.out = 0;
+        stage.card = 0;                                 /* (the card's top back) */
+        memset(ui.col, 0, sizeof ui.col);
+        return;
+    }
+    if (!stage.out)
+        return;
+    if (stage.drop) {                                   /* each card whole (its value snaps, no roll), its bottom rows */
+        uint32_t c;
+        for (c = 0; c < 4u; c++) {
+            ui.col[c][0] = 0;
+            ui.roll[c].sig = (uint8_t)~ui.roll[c].sig;
+        }
+        stage_drop_rows = (uint8_t)((ST_DROP + 1u - stage.drop) * CARD_H / ST_DROP);
+        stage_columns();
+        stage_drop_rows = 0;
+        stage.drop--;
+        return;
+    }
+    stage_columns();
+}
+
+/* the BG around the card and the panel (a full redraw: the canvases cover the rest) */
 static void stage_frame(void)
 {
-    lcd_fill(0, Y_LABEL, 4, CARD_H, T_BG);
-    lcd_fill(236, Y_LABEL, 4, CARD_H, T_BG);
-    lcd_fill(0, Y_LABEL + CARD_H, 240, ST_PANEL_Y - Y_LABEL - CARD_H, T_BG);
-    lcd_fill(0, ST_PANEL_Y + ST_PANEL_H, 240, ST_SOUND_Y - ST_PANEL_Y - ST_PANEL_H, T_BG);
-    lcd_fill(0, ST_SOUND_Y + 19, 240, 2, T_BG);
-    lcd_fill(0, ST_STATUS_Y + 19, 240, 240 - ST_STATUS_Y - 19, T_BG);
+    lcd_fill(0, ST_CARD_Y, ST_CARD_X, ST_CARD_H, T_BG);   /* left and right of the card */
+    lcd_fill(ST_CARD_X + ST_CARD_W, ST_CARD_Y, 240u - ST_CARD_X - ST_CARD_W, ST_CARD_H, T_BG);
+    lcd_fill(0, ST_CARD_Y + ST_CARD_H, 240, ST_PANEL_Y - ST_CARD_Y - ST_CARD_H, T_BG);
+    lcd_fill(0, ST_PANEL_Y + ST_PANEL_H, 240, 240u - ST_PANEL_Y - ST_PANEL_H, T_BG);
 }
-/* The scope is drawn last, as in the approved UI, while the LCD sends it. */
+
+/* every frame the knobs; every other frame (the scope's) the card, then the panel last */
 static void stage_draw(void)
 {
-    stage_columns();
-    if (!ui.force && (ui.frame & 1u)) return;
-    stage_sound();
-    stage_status();
+    stage_knobs();
+    if (!ui.force && (ui.frame & 1u))
+        return;
+    stage_card();
     stage_panel();
 }

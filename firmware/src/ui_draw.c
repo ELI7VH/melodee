@@ -237,7 +237,7 @@ static void draw_head(void)
                 song.playing ? T_TEXT : T_MID, T_BG);
     roll_text(ROLL_BPM, BPM_X, 3, b, ui.bpm_t ? T_ACCENT : T_TEXT);
     x = BPM_X + BPM_W + 2;                              /* (past the widest BPM) */
-    if (TSEL->p[P_AHOLD]) {                             /* the ARP's HOLD (PLAY latches it): "HOLD" */
+    if (TSEL->p[P_AHOLD] && !ui.home) {                 /* the ARP's HOLD (PLAY latches it): "HOLD" (Stage: its pill) */
         x = cv_text_on(x + 2, 4, &AF_X, "HOLD", T_THEME, T_BG) + 4;
     }
     if (msg) {                                   /* a message, or the layer's name (may hold a keycap) */
@@ -290,6 +290,7 @@ static void draw_frame(int stage)
  * and value in the accent. ratio: 0..1000 for the gauge, -1 = no gauge. icon: ICON_* (icons.c), ICON_AUTO = by label;
  * a label too long to share the card with its icon goes without it.
  * vc: the value's colour (T_THEME, T_DIM inactive, T_ACCENT the knob just turned) */
+static uint8_t stage_drop_rows;                         /* Stage's knobs dropping in: the cards' bottom rows only, 0 all */
 static void col_old_value(uint32_t c, char *ov)          /* the value card c drew before (in its cache key), 16 bytes */
 {
     const char *k = ui.col[c];
@@ -413,7 +414,10 @@ static void draw_column(uint32_t c, const char *label, const char *val, const ch
         }
     }
     cv_oy = 0;
-    cv_blit((uint32_t)CARD_X(c), Y_LABEL + (strip ? ROLL_Y : 0));
+    if (stage_drop_rows && !strip)                      /* (rows r0 .. under the header: Y_LABEL - r0 wraps, + r0 back) */
+        cv_blit_from((uint32_t)CARD_X(c), Y_LABEL - (uint32_t)(COL_H - stage_drop_rows), COL_H - stage_drop_rows);
+    else
+        cv_blit((uint32_t)CARD_X(c), Y_LABEL + (strip ? ROLL_Y : 0));
 }
 
 /* an action's column (act_cols): picked, the OCT+ keycap (accent while it would do something); else "--" */
@@ -532,8 +536,8 @@ static void draw_foot(void)
         kh[1] = (khint_t){KC_OCTDN, hb + 5};
         cv_key_row(8, 232, 2, kh, 2, act_ready() ? 3u : 2u, T_BG);
     }
-    cv_icon_mid(6, 25, 16, trk_icon(song.sel, 1), T_THEME, T_BG);   /* row 2: the track's numeral, engine icon + */
-    x = 26;                                           /* name, sound, page */
+    x = 8;                                            /* row 2: the engine (icon +) name, the sound, the page (one
+                                                       * track: no numeral) */
     if (MELODEE_ICONS)
         x += cv_icon_on(x, 20, 12, engine_icon(ename), T_MID, T_BG) + 5;
     x = cv_text_fit(x, 19, &AF_S, ename, T_THEME, T_BG, 80);
@@ -570,7 +574,7 @@ static void draw_columns(void)
     uint32_t c;
     char val[12];
     const char *unit;
-    if (ui.home)                                        /* Stage draws its native knob cards (ui_stage.c). */
+    if (ui.home)                                        /* Stage: its knobs drop in when turned (ui_stage.c stage_knobs) */
         return;
     if (cur_page()->graph == GR_SCALE_PICKER) {
         uint32_t scale = (uint32_t)clamp(TSEL->p[P_SCALE], 0, SCALE_TOTAL - 1u);

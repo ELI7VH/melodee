@@ -434,7 +434,12 @@ static void ref_scene(const char *name)
         if (str_eq(name, "stage_released")) {
             input_off(TSEL, 57); input_off(TSEL, 60); input_off(TSEL, 64); input_off(TSEL, 67);
         }
-        if (str_eq(name, "stage_cutoff")) { ui.hot_col = 0; ui.hot_t = 30; stage_knob_touch(); }
+        if (str_eq(name, "stage_cutoff")) { ui.hot_col = 0; ui.hot_t = 30; }
+        if (str_eq(name, "stage_cutoff") || str_eq(name, "stage_p5_knobs")) {
+            stage_knob_touch(); stage.out = 1; stage.drop = 0;   /* the knobs out, dropped in */
+        } else {
+            stage.knob_ms = 0; stage.out = stage.drop = 0;
+        }
     } else if (str_eq(name, "browser")) {
         uint32_t i, total;
         for (i = 0; i < NELEM(CAT_ORDER) && CAT_ORDER[i] != CAT_BASS; i++) {}
@@ -497,7 +502,12 @@ static uint32_t draw_references(const char *dir)
     ref_scene("stage_held");
     ux.trk = 255; palette_track(0); /* a preview in the synth's actual coral colour */
     draw_scene(dir, UI_DEFAULT_INDEX, "synth_home");
-    return NELEM(names) + 1u;
+    /* everything that plays the keys on: the ARP (UP, HOLD), CHORD, a scale (D DORIAN) */
+    TSEL->p[P_AMODE] = 1; TSEL->p[P_AHOLD] = 1; TSEL->p[P_CHRD] = 1; TSEL->p[P_QUANT] = Q_SNAP;
+    TSEL->p[P_ROOT] = 2; TSEL->p[P_SCALE] = 4;
+    draw_scene(dir, UI_DEFAULT_INDEX, "synth_home_playing");
+    TSEL->p[P_AMODE] = TSEL->p[P_AHOLD] = TSEL->p[P_CHRD] = TSEL->p[P_QUANT] = 0;
+    return NELEM(names) + 2u;
 }
 
 int main(int argc, char **argv)
@@ -542,6 +552,25 @@ int main(int argc, char **argv)
             snprintf(name, sizeof name, "stage_scale%02u_arp%u", scl, a); cur_name = name;
             screen_clear(); ui.force = 1; ui_draw(); lint(); scenes++;
         }
+    }
+    /* Stage with every factory sound of every engine: the name as large as it fits, never cut or spilling (the lint);
+     * the longest name of each engine saved to look at (stage_name_e<N>) */
+    for (uint32_t e = 0; e < NENGINES; e++) {
+        uint32_t longest = 0, lw = 0;
+        if (!eng_ok(e)) continue;
+        ui_power_on(); settings.palette = UI_DEFAULT_INDEX; palette_set(UI_DEFAULT_INDEX);
+        engine_load_of(TSEL, e, 0); TSEL->engine = TSEL->eng_req; ui.home = 1;
+        for (uint32_t k = 0; k < ENGINES[e]->npresets; k++) {
+            char nm[24];
+            apply_preset_to(TSEL, k);
+            sound_name(TSEL, nm);
+            if ((uint32_t)text_w(&AF_L, nm) > lw) { lw = (uint32_t)text_w(&AF_L, nm); longest = k; }
+            snprintf(name, sizeof name, "stage_e%u_sound%03u", e, k); cur_name = name;
+            screen_clear(); ui.force = 1; ui_draw(); lint(); scenes++;
+        }
+        apply_preset_to(TSEL, longest);
+        snprintf(name, sizeof name, "stage_name_e%u", e);
+        draw_scene(dir, UI_DEFAULT_INDEX, name); scenes++;
     }
     fprintf(rep, "%u scenes, %u findings, %u MONO pixels off gray\n", scenes, nfind, mono_bad);
     printf("SYNTH UI: %u scenes, %u findings, %u MONO pixels off gray\n", scenes, nfind, mono_bad);
