@@ -36,23 +36,21 @@ Texts differ on purpose (the device's own sound names): the targets leave room f
 
 ## Synth-only HOME
 
-The single-instrument build draws its one sound as Stage's columns draw a track (`concept_stage_columns`), across the
-screen: under the header, the sound's card (x 4..236, y 22..122) with the bar and the category in the theme's
-colour, the place of the sound at the right (`34 / 201`, `U07`, `P012`), the name as large as it fits (Rubik 30 px
-on one line, else on two lines that take the engine's row, else 15 px), the engine under a one-line name, and four
-pills of what plays the keys (the ARP's mode, HOLD, CHORD, the scale) in the lights' grammar: filled happening now,
-outlined and dim there to turn on. Under the card, the panel (y 126..238): the chord and the notes played on one
-line at its top (`stage_held`'s line), the smooth waveform in the band under them, dimmed while they are held (no
-note played yet: the waveform over the whole panel). A knob turned drops the engine's four knobs over the card's
-top (`stage_dropping`, `stage_cutoff`) and the band shows what the knob shapes, its value at the right; the card is
-whole again ST_KNOB_MS after the last turn. The effects keep their pages and the held FX layer.
+The reference is the previous firmware's Stage (`cd4f94e`, rendered by its own `tests/ui_render.c`), not the mockups.
+The synth build keeps its header and its panel unchanged (y 178..238: the chord and notes in front of the smooth
+waveform, dimmed while held; the knob turning's picture and value) and draws its one track's column, the selected
+one, across the four columns' place (x 4..236, y 22..174, outlined in the track's colour on the panel's fill, in two
+canvas slices): the bar and the role (the sound's category, else `T1`), the sound in the knob values' type (15 px,
+one line or two), the engine, the pills of what plays the keys drawn as the patterns' pills were (filled: the ARP's
+mode, HOLD, CHORD, the scale; dashed: HOLD waiting for the ARP), the voices as the step dots (a dot a voice the engine
+can sound: lit while sounding, the newest larger in text, dimmer while releasing), and five of the level's rings:
+LEVEL (dB) and the four sends (%), each labelled as the columns are. A knob turned drops the four knob cards over the
+card's top as before. The footer starts with the engine (one track: no numeral).
 
-`tests/synth_ui_render.c` renders the reference states on the single track (the mockups' amber accent for the
-comparison, coral for `synth_home` and `synth_home_playing`), every factory sound of every engine on Stage under the
-layout lint (the name never cut or spilling; `stage_name_e<N>`: each engine's longest), and every scale with every
-ARP mode on the card's pills. The host suite writes the comparisons to `build/ui_synth_mock`; the knobs dropped
-in (`stage_p5_knobs`, rows 22..66) are checked against the mockup with a parity floor of 60 (the device's labels
-and value formats differ). The sound pages keep the main firmware's layouts.
+`tests/synth_ui_render.c` renders the shared states (`ref_stage_*`, `synth_home`, `synth_home_playing`), every
+factory sound of every engine on Stage under the layout lint (`stage_name_e<N>`: each engine's longest), and every
+scale with every ARP mode on the pills. The other screens match the previous firmware's renders pixel for pixel but
+for the footer numeral and the menu rows the sequencer took with it.
 
 ## Tokens (from the mockups' code)
 
