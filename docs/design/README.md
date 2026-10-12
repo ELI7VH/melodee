@@ -43,8 +43,8 @@ panel's fill, in two canvas slices), in the four track colours as the four colum
 role (the sound's category, else `T1`) in the track's colour, the sound in the knob values' type (15 px, one line or
 two), the engine, the level ring at the top right (dB), the pills of what plays the keys drawn as the patterns' pills
 were, each in a column's colour (ARP coral, HOLD amber, CHORD mint, the scale lilac; HOLD with the ARP off dashed),
-the voices as the step dots (four a column slot, in its colour: lit while sounding, the newest larger in text, dimmer
-while releasing), and the four sends as the level's ring under the slots (DST CHO DLY REV, each in its slot's colour).
+and the four sends as the level's ring under the slots (DST CHO DLY REV, each in its slot's colour). No step dots:
+there is no sequencer, and the voices showed as dots read as one.
 A knob turned drops the four knob cards over the card's top as before, each in its slot's colour; the panel's picture
 and value take the turning knob's colour. The footer starts with the engine (one track: no numeral).
 
