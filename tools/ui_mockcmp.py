@@ -66,16 +66,25 @@ def main():
     ap.add_argument("out_dir")
     ap.add_argument("--palette", default="NIGHT")
     ap.add_argument("--min", type=float, default=0.0)
+    ap.add_argument("--screens", nargs="+", choices=SCREENS + ["stage_p5_knobs"], default=SCREENS,
+                    help="compare only the retained screens of a firmware variant")
+    ap.add_argument("--crop", nargs=4, type=int, metavar=("LEFT", "TOP", "RIGHT", "BOTTOM"),
+                    help="compare a shared region when a firmware variant removes other tracks")
     a = ap.parse_args()
     os.makedirs(a.out_dir, exist_ok=True)
     lines, bad = ["screen            colour  layout  parity"], 0
-    for s in SCREENS:
+    for s in a.screens:
         rp, dp = os.path.join(REF, s + ".png"), os.path.join(a.render_dir, a.palette, "ref_" + s + ".png")
+        ppm = os.path.join(a.render_dir, "ppm", a.palette + "_ref_" + s + ".ppm")
+        if os.path.exists(ppm):
+            dp = ppm                   # the current firmware render, even if an older PNG exists
         if not os.path.exists(rp) or not os.path.exists(dp):
             lines.append(f"{s:16s}  missing {'reference' if not os.path.exists(rp) else 'device render'}")
             bad += 1
             continue
         ref, dev = Image.open(rp).convert("RGB"), Image.open(dp).convert("RGB")
+        if a.crop:
+            ref, dev = ref.crop(tuple(a.crop)), dev.crop(tuple(a.crop))
         c, l = colour_score(ref, dev), layout_score(ref, dev)
         p = (c + l) / 2
         bad += p < a.min
@@ -83,7 +92,7 @@ def main():
         sheet(ref, dev, os.path.join(a.out_dir, s + ".png"))
     open(os.path.join(a.out_dir, "report.txt"), "w").write("\n".join(lines) + "\n")
     print("\n".join(lines))
-    sys.exit(1 if bad and a.min else 0)
+    sys.exit(1 if any("missing " in line for line in lines) or (bad and a.min) else 0)
 
 
 if __name__ == "__main__":

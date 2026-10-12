@@ -385,6 +385,121 @@ static void draw_scene(const char *dir, uint32_t palette, const char *name)
     if (palette == UI_GRAY_INDEX) { mono_check(); audit_scene(name); }
     write_ppm(dir, UI_PALETTES[palette].name, name);
 }
+/* The approved mockups' sound states, using the synth's single track. Keep
+ * their amber accent in these fixtures so the comparison measures layout,
+ * rather than the former selected track's colour. Normal renders stay coral. */
+static uint32_t ref_preset(uint32_t e, const char *name)
+{
+    for (uint32_t k = 0; k < ENGINES[e]->npresets; k++)
+        if (str_eq(eng_preset(ENGINES[e], k)->name, name)) return k;
+    return 0;
+}
+static void ref_engine(uint32_t e, uint32_t preset)
+{
+    set_engine_of(TSEL, e); apply_preset_to(TSEL, preset); TSEL->engine = TSEL->eng_req;
+}
+static void ref_title(const char *title)
+{
+    uint32_t i;
+    for (i = 0; i < NPAGES && !str_eq(PAGES[i].title, title); i++) {}
+    if (i == NPAGES) { fprintf(stderr, "missing reference page: %s\n", title); exit(2); }
+    ui.home = 0; ui.page = (uint8_t)i; page_entered();
+}
+static void ref_graph(uint32_t graph)
+{
+    uint32_t i;
+    for (i = 0; i < NPAGES && PAGES[i].graph != graph; i++) {}
+    if (i == NPAGES) exit(2);
+    ui.home = 0; ui.page = (uint8_t)i; page_entered();
+}
+static void ref_scene(const char *name)
+{
+    ui_power_on(); memset(&stage, 0, sizeof stage);
+    settings.palette = UI_DEFAULT_INDEX; palette_set(UI_DEFAULT_INDEX);
+    ref_engine(ENGI_PROPHET, 33);
+    p5_patch_of(TSEL)->raw[P5_CUTOFF] = 79;
+    p5_patch_of(TSEL)->raw[P5_RESONANCE] = 38;
+    p5_patch_of(TSEL)->raw[P5_ENV_FILTER] = 105;
+    p5_patch_of(TSEL)->raw[P5_RELEASE_AMP] = 40;
+    song.g[G_BPM] = 124; song.batt_raw = 600; usb.config = 0;
+    memset(live_last, 0, sizeof live_last); memset(live_held, 0, sizeof live_held);
+    for (uint32_t k = 0; k < SCOPE_N; k++) {
+        double a = k * 2.0 * 3.14159265 / 75.0;
+        scope_buf[k] = (int16_t)(12000.0 * (0.55 * sin(a) + 0.25 * sin(a * 2.0 + 0.6) + 0.15 * sin(a * 3.05)));
+    }
+    scope_w = 0;
+    if (!strncmp(name, "stage_", 6)) {
+        input_on(TSEL, 57, 100); input_on(TSEL, 60, 100);
+        input_on(TSEL, 64, 100); input_on(TSEL, 67, 100);
+        if (str_eq(name, "stage_released")) {
+            input_off(TSEL, 57); input_off(TSEL, 60); input_off(TSEL, 64); input_off(TSEL, 67);
+        }
+        if (str_eq(name, "stage_cutoff")) { ui.hot_col = 0; ui.hot_t = 30; stage_knob_touch(); }
+    } else if (str_eq(name, "browser")) {
+        uint32_t i, total;
+        for (i = 0; i < NELEM(CAT_ORDER) && CAT_ORDER[i] != CAT_BASS; i++) {}
+        list_set(LM_CAT + i); ref_graph(GR_BROWSE); list_cur(&total);
+        brw.on = 1; brw.trk = 0; brw.mode = list_mode(); brw.n = total > 11u ? 11u : 0u;
+        brw.t = fm1_ms; brw.x = 4;
+    } else if (str_eq(name, "sections_p5") || str_eq(name, "map_p5")) {
+        ref_title("P5 FILTER");
+        if (str_eq(name, "map_p5")) smap_open(); else { ui.hot_col = 0; ui.hot_t = 30; }
+    } else if (str_eq(name, "scl_list")) {
+        TSEL->p[P_ROOT] = 3; TSEL->p[P_SCALE] = 2;
+        ref_title("SCL"); lst.page = ui.page; lst.row = 1; lst.first = 0;
+    } else if (str_eq(name, "scales")) {
+        TSEL->p[P_SCALE] = 39; ui.scale_family = 2; scale_favorite_set(39, 1); ref_graph(GR_SCALE_PICKER);
+    } else if (str_eq(name, "sheet_sound")) {
+        ui.home = 0; ui.page = page_first(FAM_EDIT); page_entered(); page_sheet_open();
+    } else if (str_eq(name, "settings")) {
+        ui.menu = 1; ui.menu_sel = 0;
+    } else if (str_eq(name, "fmeg") || str_eq(name, "map_fm6")) {
+        static const uint8_t R[4] = {95, 20, 20, 50}, L[4] = {99, 74, 58, 0};
+        ref_engine(ENGI_FM6, ref_preset(ENGI_FM6, "TINE EP")); fm6_opsel = 2;
+        uint8_t *op = &fm6_patch[0][(5u - 2u) * FP_OP];
+        for (uint32_t i = 0; i < 4u; i++) { op[FP_R1 + i] = R[i]; op[FP_L1 + i] = L[i]; }
+        fm6_pgen[0]++; ref_title("EG RATE");
+        if (str_eq(name, "map_fm6")) smap_open(); else { ui.hot_col = 2; ui.hot_t = 30; }
+    } else {
+        ref_engine(3, ref_preset(3, "SAW BASS")); TSEL->p[P_LD_FLT] = 30;
+        if (str_eq(name, "edit_osc") || str_eq(name, "picker_wave")) {
+            ui.home = 0; ui.page = page_first(FAM_EDIT); page_entered();
+            if (str_eq(name, "picker_wave")) pick_touch(1);
+        } else if (str_eq(name, "mod") || str_eq(name, "picker_mod")) {
+            TSEL->p[P_M1SRC] = MS_LFO; TSEL->p[P_M1DST] = MD_CUT; TSEL->p[P_M1AMT] = 40;
+            TSEL->p[P_M2SRC] = MS_MODW; TSEL->p[P_M2DST] = MD_E1 + 3; TSEL->p[P_M2AMT] = -64;
+            TSEL->p[P_M3SRC] = MS_VEL; TSEL->p[P_M3DST] = MD_AMP; TSEL->p[P_M3AMT] = 19;
+            mod_ui_slot = 1; ref_title("MOD");
+            if (str_eq(name, "picker_mod")) pick_touch(0); else { ui.hot_col = 3; ui.hot_t = 30; }
+        } else if (str_eq(name, "arp")) {
+            TSEL->p[P_AMODE] = 1; TSEL->p[P_AOCT] = 2; ref_title("ARP"); ui.hot_col = 0; ui.hot_t = 30;
+        } else if (str_eq(name, "slicer")) {
+            TSEL->p[P_SLCR] = SL_GATE; TSEL->p[P_SLPAT] = 1; TSEL->p[P_SLDEPTH] = 127;
+            ref_title("SLICER"); ui.hot_col = 3; ui.hot_t = 30;
+        } else {
+            ref_title(str_eq(name, "env") ? "ENV" : str_eq(name, "lfo") ? "LFO" : str_eq(name, "fx") ? "FX" : "DLY");
+            if (str_eq(name, "dly")) { song.g[G_DTIME] = 1; song.g[G_DFDBK] = 47; song.g[G_DCOLOR] = 51; song.g[G_DMIX] = 85; }
+            if (!str_eq(name, "fx")) { ui.hot_col = str_eq(name, "env") ? 2 : str_eq(name, "lfo") ? 0 : 1; ui.hot_t = 30; }
+        }
+    }
+    palette_track(1); ux.trk = 0; /* retain the reference accent when ui_draw selects the one live track */
+}
+static uint32_t draw_references(const char *dir)
+{
+    static const char *const names[] = {"stage_held", "stage_released", "stage_cutoff", "stage_p5_knobs", "browser", "env", "lfo",
+        "edit_osc", "fx", "dly", "sections_p5", "map_p5", "map_fm6", "scl_list", "sheet_sound", "mod",
+        "picker_mod", "arp", "slicer", "fmeg", "scales", "picker_wave", "settings"};
+    char name[96];
+    for (uint32_t i = 0; i < NELEM(names); i++) {
+        ref_scene(names[i]); snprintf(name, sizeof name, "ref_%s", names[i]);
+        draw_scene(dir, 0, name);
+    }
+    ref_scene("stage_held");
+    ux.trk = 255; palette_track(0); /* a preview in the synth's actual coral colour */
+    draw_scene(dir, UI_DEFAULT_INDEX, "synth_home");
+    return NELEM(names) + 1u;
+}
+
 int main(int argc, char **argv)
 {
     const char *dir = argc > 1 ? argv[1] : "build/ui_synth";
@@ -392,7 +507,7 @@ int main(int argc, char **argv)
     snprintf(path, sizeof path, "%s/report.txt", dir); rep = fopen(path, "w");
     snprintf(path, sizeof path, "%s/text_audit.tsv", dir); audf = fopen(path, "w");
     if (!rep || !audf) return 2;
-    uint32_t scenes = 0;
+    uint32_t scenes = draw_references(dir);
     for (uint32_t palette = 0; palette < UI_PAL_ENTRIES; palette++) {
         for (uint32_t e = 0; e < NENGINES; e++) {
             if (!eng_ok(e)) continue;

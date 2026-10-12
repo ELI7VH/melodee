@@ -90,6 +90,19 @@ synth_integration() {
         fail "web checks require Node.js"
     fi
 }
+synth_ui() {
+    build synth_ui_render synth_ui_render -O1 $FW || return
+    step "all synth UI pages, palettes and FM6 algorithms" "$OUT/synth_ui_render" build/ui_synth
+    if [ "$PIL" = 1 ]; then
+        step "HOME knob cards match the established design" python3 tools/ui_mockcmp.py build/ui_synth build/ui_synth_home_mock \
+            --screens stage_p5_knobs --crop 0 22 240 66 --min 60
+        step "retained UI beside the approved mockups" python3 tools/ui_mockcmp.py build/ui_synth build/ui_synth_mock \
+            --screens browser env lfo edit_osc fx dly settings sheet_sound picker_wave sections_p5 map_p5 map_fm6 \
+            scl_list mod picker_mod arp slicer fmeg scales
+    else
+        fail "UI design comparisons require Pillow"
+    fi
+}
 if core; then
     job synth_integration
     t "flash storage A/B and torn writes" storage_test
@@ -108,7 +121,7 @@ if core; then
     run "installer simulated device" python3 tests/install_test.py
     t "M-UPGRADE" ota_test -DOWN_PKG=1 -- "$OUT/ota_test" build/melodee-synth.fwsc
     mkdir -p build/ui_synth/ppm
-    t "all synth UI pages, palettes and FM6 algorithms" synth_ui_render -O1 $FW -- "$OUT/synth_ui_render" build/ui_synth
+    job synth_ui
 fi
 if sound; then
     t "native fp32 numerical contracts" synth_fpu_test -O2 $FW

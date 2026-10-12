@@ -51,7 +51,9 @@ def to565(c):
     r, g, b = c
     if r == g == b:                     # a gray stays on the RGB565 gray axis (G = 2 R)
         return ((r >> 3) << 11) | ((r >> 3) << 6) | (r >> 3)
-    return ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3)
+    # Choose the nearest display colour. Truncation turned NIGHT's warm
+    # (23, 20, 31) background into (16, 20, 24), reversing its red/green balance.
+    return (((r * 31 + 127) // 255) << 11) | (((g * 63 + 127) // 255) << 5) | ((b * 31 + 127) // 255)
 
 
 def from565(v):

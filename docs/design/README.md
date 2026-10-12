@@ -34,6 +34,22 @@ NAME, NEW SONG, About and the GLO layer follow `r6_pages` by eye (no ref scene: 
 
 Texts differ on purpose (the device's own sound names): the targets leave room for them.
 
+## Synth-only HOME
+
+The single-instrument build uses the established `stage_note_overlay` layout: four permanent 54 x 44 knob
+cards at y 22, the chord and its notes on separate lines over the smooth waveform, and the selected sound's
+rounded, outlined lane. The scope begins at the same y 70 and grows to 124 pixels; the sound lane at y 198
+and a quiet playing-status row at y 219 occupy the former additional track lanes. Effects use their existing
+pages and held FX layer. The full-width title, status pills and five effect rings are retired.
+
+`tests/synth_ui_render.c` renders the retained reference states on the single track, using the mockups' amber
+accent for comparison and coral for the actual HOME preview. The host suite writes comparisons to
+`build/ui_synth_mock`. These report parity with the historical mockups; they do not impose a new score gate
+on evolved native engine controls or the removal of the three other tracks. The permanent HOME knob-card
+region is checked against `stage_p5_knobs` with a parity floor of 60 (native labels and value formats differ);
+this rejects the replacement dashboard. Layout lint still rejects clipping and overlap. The sound-page layouts
+were also compared against the pre-synth branch at `cd4f94e`.
+
 ## Tokens (from the mockups' code)
 
 Colours: background `#17141F`, panel `#1D1926`, surface `#221E2C`, raised `#262033` (the selected lane), quiet lane
