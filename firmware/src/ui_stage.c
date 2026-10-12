@@ -14,7 +14,7 @@
  * after it would wait for it, lcd_window). */
 #define ST_COL_Y Y_LABEL                                /* the card: the four columns' place, x 4 .. 236, y 22 .. 174 */
 #define ST_COL_X CARD_X(0)
-#define ST_COL_W (CARD_X(3) + CARD_W - CARD_X(0))
+#define ST_COL_W (240 - 2 * ST_COL_X)                  /* (as wide as the panel) */
 #define ST_COL_H 152
 #define ST_PANEL_Y (ST_COL_Y + ST_COL_H + 4)            /* the panel: y 178 .. 238 */
 #define ST_PANEL_H 60
@@ -97,7 +97,7 @@ static void stage_wave(uint16_t c, int32_t top, int32_t h)
 }
 
 /* the notes the selected track played (live_last: its last voicing, held or let go), the chord they make, in front of
- * what is on the canvas (cv_over): the root 30 px, its quality 15 px, then the notes 11 px, on one baseline (38).
+ * what is on the canvas (cv_over): the root 30 px, its quality and the notes 15 px, on one baseline (38).
  * Held: the chord in text, the notes in the track's colour; let go: both faded into the panel. 0 none, 1 let go, 2 held */
 static int stage_notes(int32_t x1)
 {
@@ -133,8 +133,8 @@ static int stage_notes(int32_t x1)
         }
         x += 10;
     }
-    notes_fit(b, note, n, &AF_S, x1 - x);
-    cv_text(x, 27, &AF_S, b, cn);
+    notes_fit(b, note, n, &AF_M, x1 - x);
+    cv_text(x, 23, &AF_M, b, cn);
     return (int)(1u + (held != 0u));
 }
 /* HOME's notes alone (tests/ui_test.c): 1 = there were notes */
@@ -236,81 +236,71 @@ static void stage_panel(void)
 }
 
 /* --------------------------------------------------------- the card --- */
-/* a name in two lines of w px: the first ends at the last space, '.' or '-' that fits (one long word: cut), the rest below */
-static void stage_two_lines(const char *s, char *a, char *b, int32_t w)
+/* The card as large as the little screen reads it: the role 12 px (S), the sound 30 px (L), the pills 12 px, the rings
+ * 34 px with their labels and values 12 px. Rows: the role 5 .. 19, the sound 15 .. 83, the pills 84 .. 100, the rings'
+ * labels 102 .. 116, the rings 118 .. 152 */
+#define ST_NAME_W (ST_COL_W - 12)                       /* the sound and the pills: x 6 .. 226 */
+#define ST_PILL_Y 84
+#define ST_RING_Y 135                                   /* the rings' centre (KNOB_BIG) */
+
+/* a pill on row y at x in face f, as the patterns' were drawn: filled in c (on), dashed (waiting); its right edge + 3 */
+static int32_t stage_pill(int32_t x, int32_t y, const aafont_t *f, const char *s, int dashed, uint16_t c, uint16_t bg)
 {
-    uint32_t i, cut = 0;
-    for (i = 0; s[i] && i < 15u; i++)                   /* (cut: the first line's length; a space goes) */
-        if (s[i] == ' ' || s[i] == '.' || s[i] == '-') {
-            uint32_t n = i + (s[i] != ' ');
-            str_cpy(a, s, n + 1u);
-            if (n && text_w(&AF_S, a) <= w) cut = n;
-        }
-    if (!cut || text_w(&AF_S, s) <= w) {
-        str_cpy(a, s, 16);
-        b[0] = 0;
-        return;
-    }
-    str_cpy(a, s, cut + 1u);
-    str_cpy(b, s + cut + (s[cut] == ' '), 16);
-}
-/* a pill on row y at x, as the patterns' were drawn: filled in c (on), dashed (waiting); its right edge + 3 */
-static int32_t stage_pill(int32_t x, int32_t y, const char *s, int dashed, uint16_t c, uint16_t bg)
-{
-    int32_t w = text_w(&AF_X, s) + 10;
+    int32_t w = text_w(f, s) + 2 * (f->h - 7), h = f->h + 2;
     if (dashed) {
-        cv_dashed(x, y, w, 14, 3, c);
-        cv_text_c(x + w / 2, y + 1, &AF_X, s, c, bg);
+        cv_dashed(x, y, w, h, 3, c);
+        cv_text_c(x + w / 2, y + 1, f, s, c, bg);
     } else {
-        cv_rrect(x, y, w, 14, 4, c, bg);
-        cv_text_c(x + w / 2, y + 1, &AF_X, s, T_INK, c);
+        cv_rrect(x, y, w, h, h / 3, c, bg);
+        cv_text_c(x + w / 2, y + 1, f, s, T_INK, c);
     }
     return x + w + 3;
 }
 /* the card's parts, in the card's rows (the canvas holds a slice of them: cv_oy) */
 typedef struct {
     char nm[24], scl[16];
-    const char *en;
     uint32_t cat, lvl, amode, hold, chord, qnt, mute;
     int16_t send[4];
     int pending;
     uint16_t tc, bg;
 } stage_card_t;
-/* the name in the knob values' type (15 px), in the first three column slots: one line, else two (cut at the last
- * space, '.' or '-' that fits), else free text; rows 19 .. 53 */
+/* the sound as large as it fits: 30 px on one line, else on two (cut at the last space, '.' or '-' that fits), else
+ * (a sign L lacks) the knob values' 15 px */
 static void stage_name(const char *s, uint16_t c, uint16_t bg)
 {
-    char a[24], b[24];
+    char a[24];
     uint32_t i, cut = 0;
-    const int32_t w = CARD_X(3) - ST_COL_X - 8;         /* (the level's ring in the last slot) */
-    if (text_w(&AF_M, s) <= w) {
-        cv_text_on(6, 19, &AF_M, s, c, bg);
+    for (i = 0; s[i]; i++)
+        if (glyph_at(&AF_L, (uint8_t)s[i]) < 0) {
+            cv_free_text(6, 32, &AF_M, s, c, bg, ST_NAME_W);
+            return;
+        }
+    if (text_w(&AF_L, s) <= ST_NAME_W) {
+        cv_text_on(6, 24, &AF_L, s, c, bg);
         return;
     }
     for (i = 0; s[i] && i < 22u; i++)
         if (s[i] == ' ' || s[i] == '.' || s[i] == '-') {
             uint32_t n = i + (s[i] != ' ');
             str_cpy(a, s, n + 1u);
-            if (n && text_w(&AF_M, a) <= w) cut = n;
+            if (n && text_w(&AF_L, a) <= ST_NAME_W) cut = n;
         }
     if (!cut) {
-        cv_free_text(6, 19, &AF_M, s, c, bg, w);
+        cv_free_text(6, 24, &AF_L, s, c, bg, ST_NAME_W);
         return;
     }
     str_cpy(a, s, cut + 1u);
-    str_cpy(b, s + cut + (s[cut] == ' '), sizeof b);
-    cv_text_on(6, 19, &AF_M, a, c, bg);
-    cv_free_text(6, 36, &AF_M, b, c, bg, w);
+    cv_text_on(6, 15, &AF_L, a, c, bg);
+    cv_free_text(6, 47, &AF_L, s + cut + (s[cut] == ' '), c, bg, ST_NAME_W);
 }
-/* a ring as the columns' level was drawn (KNOB_RING, 3 px, from 7:30, its value inside), its label over it in c, centred
- * on cx; v 0..127 */
-static void stage_ring(int32_t cx, int32_t cy, const char *label, int32_t v, const char *val, uint16_t c, uint16_t bg)
+/* a ring as the pages' big knob (KNOB_BIG, from 7:30, its value inside), its label over it in c, centred on cx;
+ * v 0..127 */
+static void stage_ring(int32_t cx, const char *label, int32_t v, const char *val, uint16_t c, uint16_t bg)
 {
     int32_t a1 = v ? -KA_END + v * 2 * KA_END / 127 : -KA_END - 1;
-    if (label)
-        cv_text_c(cx, cy - 30, &AF_X, label, c, bg);
-    knob_arc(cx - KNOB_RING_R, cy - KNOB_RING_R, KNOB_RING_R, KNOB_RING_COV, KNOB_RING_ANG, -KA_END, a1, T_LINE, c, bg);
-    cv_text_c(cx, cy - 5, &AF_X, val, v ? T_TEXT : T_DIM, bg);
+    cv_text_c(cx, ST_RING_Y - KNOB_BIG_R - 16, &AF_S, label, c, bg);
+    knob_arc(cx - KNOB_BIG_R, ST_RING_Y - KNOB_BIG_R, KNOB_BIG_R, KNOB_BIG_COV, KNOB_BIG_ANG, -KA_END, a1, T_LINE, c, bg);
+    cv_text_c(cx, ST_RING_Y - 7, &AF_S, val, v ? T_TEXT : T_DIM, bg);
 }
 static void stage_card_draw(const stage_card_t *c)
 {
@@ -321,35 +311,42 @@ static void stage_card_draw(const stage_card_t *c)
     cv_rrect(0, 0, ST_COL_W, ST_COL_H, 6, c->bg, T_BG);
     if (!stage.out) {                                   /* (under the knobs, while they are out: not drawn) */
         for (i = 0; i < 4u; i++)                        /* the four columns' bars, each in its colour */
-            cv_rect(CARD_X(i) - ST_COL_X + 3, 0, CARD_W - 6, 3, c->mute ? T_DIM : T_TRK(i));
-        cv_text_on(6, 6, &AF_X, c->cat == CAT_KEYS ? "CHORDS" : c->cat && c->cat != CAT_OTHER ? CAT_NAME[c->cat] : "T1",
+            cv_rect(3 + (int32_t)i * ST_COL_W / 4, 0, ST_COL_W / 4 - 6, 3, c->mute ? T_DIM : T_TRK(i));
+        cv_text_on(6, 5, &AF_S, c->cat == CAT_KEYS ? "CHORDS" : c->cat && c->cat != CAT_OTHER ? CAT_NAME[c->cat] : "T1",
                    c->tc, c->bg);
         stage_name(c->nm, c->pending ? T_ACCENT : c->mute ? T_DIM : T_TEXT, c->bg);
-        if (c->lvl) {                                   /* the level, its ring at the top right (dB) */
-            int32_t d = LEVEL_DB_X10[c->lvl];
-            fmt_int(v, (d + (d < 0 ? -5 : 5)) / 10);
-        } else {
-            str_cpy(v, "OFF", sizeof v);
-        }
-        stage_ring(CARD_X(3) - ST_COL_X + 27, 30, 0, (int32_t)c->lvl, v, c->tc, c->bg);
     }
-    cv_text_fit(6, 55, &AF_X, c->en, T_MID, c->bg, ST_COL_W - 8);
     {   /* what plays the keys, as the patterns' pills, each in a column's colour: on filled, HOLD with the ARP off
-         * dashed (waiting) */
-        int32_t x = 6;
-        if (c->amode)
-            x = stage_pill(x, 69, AM[c->amode], 0, T_TRK(0), c->bg);
-        if (c->hold)
-            x = stage_pill(x, 69, "HOLD", !c->amode, T_TRK(1), c->bg);
-        if (c->chord)
-            x = stage_pill(x, 69, "CHORD", 0, T_TRK(2), c->bg);
-        if (c->qnt)
-            (void)stage_pill(x, 69, c->scl, 0, T_TRK(3), c->bg);
+         * dashed (waiting); 12 px, the patterns' 10 px when the row does not hold them */
+        const char *ps[4];
+        uint16_t pc[4];
+        int dash[4];
+        const aafont_t *f = &AF_S;
+        uint32_t n = 0;
+        int32_t x = 6, w = -3;
+        if (c->amode) { ps[n] = AM[c->amode]; pc[n] = T_TRK(0); dash[n++] = 0; }
+        if (c->hold) { ps[n] = "HOLD"; pc[n] = T_TRK(1); dash[n++] = !c->amode; }
+        if (c->chord) { ps[n] = "CHORD"; pc[n] = T_TRK(2); dash[n++] = 0; }
+        if (c->qnt) { ps[n] = c->scl; pc[n] = T_TRK(3); dash[n++] = 0; }
+        for (i = 0; i < n; i++)
+            w += text_w(f, ps[i]) + 2 * (f->h - 7) + 3;
+        if (w > ST_NAME_W)
+            f = &AF_X;
+        for (i = 0; i < n; i++)
+            x = stage_pill(x, ST_PILL_Y + (f == &AF_X), f, ps[i], dash[i], pc[i], c->bg);
     }
-    for (i = 0; i < 4u; i++) {                          /* the sends: a ring under each column slot, in its colour */
-        int32_t s = clamp(c->send[i], 0, 127);
+    for (i = 0; i < 5u; i++) {                          /* the sends, each in its column's colour, then the level (dB) */
+        int32_t cx = (int32_t)(ST_COL_W * (2u * i + 1u) / 10u), s;
+        if (i == 4u) {
+            int32_t d = LEVEL_DB_X10[c->lvl];
+            if (c->lvl) fmt_int(v, (d + (d < 0 ? -5 : 5)) / 10);
+            else str_cpy(v, "OFF", sizeof v);
+            stage_ring(cx, "LEVEL", (int32_t)c->lvl, v, c->mute ? T_DIM : T_TEXT, c->bg);
+            continue;
+        }
+        s = clamp(c->send[i], 0, 127);
         fmt_int(v, s * 100 / 127);
-        stage_ring(CARD_X(i) - ST_COL_X + 27, 134, SEND[i], s, v, c->mute ? T_DIM : T_TRK(i), c->bg);
+        stage_ring(cx, SEND[i], s, v, c->mute ? T_DIM : T_TRK(i), c->bg);
     }
 }
 #define ST_SLICE 84                                     /* the card in two canvases: rows 0 .. 83 (the knobs' rows, the
@@ -378,14 +375,13 @@ static void stage_card(void)
         if (!c.nm[0]) str_cpy(c.nm, ENGINES[eng_idx(t->eng_req)]->name, sizeof c.nm);
         cur_entry(&src, &kk);
     }
-    c.en = ENGINES[eng_idx(c.pending ? src_engine(src, kk) : t->eng_req)]->name;
     c.cat = entry_cat(src, kk) % CAT_N;
     for (top = 0; top < 4u; top++)
         c.send[top] = t->p[P_DIST + top];
     str_cpy(c.scl, N_NOTE[(uint32_t)t->p[P_ROOT] % 12u], 4);
     str_cpy(c.scl + str_len(c.scl), " ", 2);
     str_cpy(c.scl + str_len(c.scl), N_SCALE[clamp(t->p[P_SCALE], 0, (int32_t)NELEM(N_SCALE) - 1)], 10);
-    sig = str_hash(str_hash(str_hash(1u + c.mute * 4u + (uint32_t)c.pending * 16u + stage.out * 32u, c.nm), c.en), c.scl) +
+    sig = str_hash(str_hash(1u + c.mute * 4u + (uint32_t)c.pending * 16u + stage.out * 32u, c.nm), c.scl) +
           c.lvl * 40503u + c.amode * 7919u + c.hold * 131u + c.chord * 613u + c.qnt * 1291u + ux.gen * 977u + ux.pal * 31u +
           c.cat * 61u;
     for (top = 0; top < 4u; top++)

@@ -38,13 +38,15 @@ Texts differ on purpose (the device's own sound names): the targets leave room f
 
 The reference is the previous firmware's Stage (`cd4f94e`, rendered by its own `tests/ui_render.c`), not the mockups.
 The synth build keeps its header and its panel (y 178..238: the chord and notes in front of the smooth waveform,
-dimmed while held) and draws its one track's column across the four columns' place (x 4..236, y 22..174, on the
-panel's fill, in two canvas slices), in the four track colours as the four columns were: the four columns' bars, the
-role (the sound's category, else `T1`) in the track's colour, the sound in the knob values' type (15 px, one line or
-two), the engine, the level ring at the top right (dB), the pills of what plays the keys drawn as the patterns' pills
-were, each in a column's colour (ARP coral, HOLD amber, CHORD mint, the scale lilac; HOLD with the ARP off dashed),
-and the four sends as the level's ring under the slots (DST CHO DLY REV, each in its slot's colour). No step dots:
-there is no sequencer, and the voices showed as dots read as one.
+dimmed while held; the notes 15 px) and draws its one track's column across the four columns' place (x 4..236, as
+wide as the panel, y 22..174, on the panel's fill, in two canvas slices), in the four track colours as the four
+columns were, and as large as the little screen reads it: the four columns' bars, the role (the sound's category,
+else `T1`, 12 px) in the track's colour, the sound 30 px (one line, else two cut at a space, '.' or '-'; a sign the
+30 px face lacks: 15 px), the pills of what plays the keys drawn as the patterns' pills were, 12 px (10 px when the
+row does not hold them), each in a column's colour (ARP coral, HOLD amber, CHORD mint, the scale lilac; HOLD with the
+ARP off dashed), and five 34 px rings with 12 px labels and values: the four sends (DST CHO DLY REV, each in its
+slot's colour) and the level (dB, in the text colour). The engine is the header's pill. No step dots: there is no
+sequencer, and the voices showed as dots read as one.
 A knob turned drops the four knob cards over the card's top as before, each in its slot's colour; the panel's picture
 and value take the turning knob's colour. The footer starts with the engine (one track: no numeral).
 
