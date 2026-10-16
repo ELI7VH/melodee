@@ -27,12 +27,17 @@ change the track you are playing.
 | Pads, both banks | Notes 36–51, channel 10 | The first DRUM track (GLO > SYSTEM > DRUM, channel 10 by default) |
 | Mod strip | CC1, keyboard channel | Mod (vibrato) |
 | Pitch strip | Pitch bend, keyboard channel | Pitch bend |
+| Main encoder, turn | CC114, relative | Next / previous sound on the track selected on the FM-1. Past an engine's last sound it goes on into the next engine's, as PRESETS does |
+| Shift + main encoder | CC112, relative | Jump to the next / previous engine's first sound |
+| Main encoder, press | CC115 | Select the next track on the FM-1 (after the last: track 1). The encoder then browses that track |
 
-Engines that do not list a knob ignore it. The main encoder sends nothing Melodee uses.
+Engines that do not list a knob ignore it.
+
+The encoder rows need the WaveLoop build of Melodee (branch `waveloop/main` of this fork); stock Melodee ignores CC112–115.
 
 Melodee 1.2.1 has no effects, so there is nothing for CC91 / CC93 to do.
 
-## Not yet tried
+## Tested
 
-Built from Melodee 1.2.1's MIDI code (`firmware/src/midi_control.c`). It has not been loaded onto a MiniLab and
-played yet.
+Encoder turn and Shift + turn: sent from a computer over USB to an FM-1 running this build, sounds and engines read
+back. Encoder press: not yet (the project had one track). The preset itself has not been loaded onto a MiniLab yet.

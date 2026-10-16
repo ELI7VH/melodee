@@ -1960,6 +1960,39 @@ static void ui_confirm_accept(void)
 }
 
 #include "ui_designer_input.c"
+/* the MiniLab encoder's counts (midi_control.c), on the main loop: a turn browses the selected track's sounds as
+ * PRESETS does on HOME (past an engine's last sound into the next engine's), Shift + turn goes to the next or previous
+ * engine's first sound (as LIST shows them), a press selects the next track (after the last: track 1) */
+static void midi_encoder_apply(void)
+{
+    int32_t sound, bank;
+    uint32_t press, i, j, e, total, pos, as, ak;
+    fm1_irq_off();
+    sound = midi_enc_sound; bank = midi_enc_bank; press = midi_enc_press;
+    midi_enc_sound = midi_enc_bank = 0; midi_enc_press = 0;
+    fm1_irq_on();
+    if (press && trk_n()) {
+        step_edit_combo();
+        track_select((song.sel + press) % trk_n());
+    }
+    if (sound)
+        browse_turn(EN_PRESET, sound);
+    if (!bank)
+        return;
+    e = TSEL->eng_req;
+    for (j = 0; j < NENG_SHOWN && eng_vis(j) != e; j++) ;
+    for (i = 1; i <= NENG_SHOWN; i++) {                 /* the next engine LIST has a sound of (FAV / a category) */
+        uint32_t src = eng_vis((uint32_t)((int32_t)j + (bank > 0 ? (int32_t)i : -(int32_t)i) + (int32_t)NENG_SHOWN * 2));
+        pos = list_scan(list_mode(), src, ENGINES[src]->npresets ? preset_init(src) : 0u, 0xFFFFFFFFu, &as, &ak, &total);
+        if (pos < total) {
+            brw.on = 0;
+            preset_go(pos);
+            ui.force = 1;
+            return;
+        }
+    }
+    ui_message("NO OTHER ENGINE IN LIST");
+}
 static void ui_input(void)
 {
     uint32_t pressed = fm1_input_edges(0), notes = fm1_input_note_edges(), now = fm1_ticks(), id, b, k;
@@ -2405,6 +2438,7 @@ static void ui_input(void)
         fm6_opsel = (uint8_t)clamp((int32_t)fm6_opsel + (s > 0 ? 1 : -1), 0, 5);
         ui.force = 1;
     }
+    midi_encoder_apply();                               /* the MiniLab encoder: sounds, engines, tracks */
     if ((s = panel_enc(EN_ALGO)) != 0) {           /* ALGORITHM: the selected track, on every page */
         step_edit_combo();
         track_select((uint32_t)clamp((int32_t)song.sel + (s > 0 ? 1 : -1), 0, (int32_t)trk_n() - 1));

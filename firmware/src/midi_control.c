@@ -273,12 +273,28 @@ static __attribute__((noinline)) void midi_parameter(track_t *t,uint32_t cc,uint
     if(id==P_PAN)v=(int32_t)value-64;
     t->p[id]=(int16_t)v;motion_capture(t,id,v);
 }
+/* MiniLab main encoder (controllers/MiniLab-3.md), any channel: CC114 turns (relative, 64 = still) browse the sounds of
+ * the track selected on the FM-1, CC112 (Shift + turn) jumps engine to engine, CC115 (press) selects the next track.
+ * Counted here (the audio ISR), done by the main loop (ui_input.c midi_encoder_apply) as the panel's own knobs are */
+static volatile int8_t midi_enc_sound, midi_enc_bank;
+static volatile uint8_t midi_enc_press;
+static void midi_encoder_cc(uint32_t cc, uint32_t value)
+{
+    int32_t d = (int32_t)value - 64;
+    if (cc == 114u && d)
+        midi_enc_sound = (int8_t)clamp(midi_enc_sound + d, -64, 63);
+    else if (cc == 112u && d)
+        midi_enc_bank = (int8_t)clamp(midi_enc_bank + d, -64, 63);
+    else if (cc == 115u && value)
+        midi_enc_press++;
+}
 static void midi_control(uint32_t ch, uint32_t cc, uint32_t value)
 {
     midi_channel_t *c = midi_channel(ch);
     uint32_t i, mask;
     track_t *t = midi_track(ch);
     if (t) midi_parameter(t,cc,value);
+    midi_encoder_cc(cc, value);
     switch (cc) {
     case 1:
         c->wheel = (uint8_t)value;
