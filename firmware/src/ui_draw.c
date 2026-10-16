@@ -31,11 +31,13 @@ static int32_t batt_shown(void)
     return batt_level();
 }
 
+#define BANK_Y (H_HEAD - 5)                             /* the bank bar's row (draw_bank_bar) */
+#define HEAD_CY 12                                      /* the header's row: above the bank bar (draw_bank_bar) */
 /* REC: filled, the selected track ready/recording; outlined, waiting or another track armed. */
 static void draw_rec_mark(int32_t x, uint16_t bg)
 {
     if (song.rec)
-        cv_icon_mid(x, H_HEAD / 2, 16, ((song.rec & ~song.rec_wait) >> song.sel) & 1u ? ICON_X_REC : ICON_X_REC_O, T_REC, bg);
+        cv_icon_mid(x, HEAD_CY, 16, ((song.rec & ~song.rec_wait) >> song.sel) & 1u ? ICON_X_REC : ICON_X_REC_O, T_REC, bg);
 }
 
 /* ---------------------------------------------------- rolling digits --- */
@@ -94,10 +96,11 @@ static void roll_note(uint32_t k, const char *a, const char *b, int snap)
  * later per place from the right), clipped to the strip. The roll's last frame clears it: the static text. */
 static int32_t roll_text(uint32_t k, int32_t x, int32_t y, const char *s, uint16_t fg)
 {
-    const aafont_t *f = TY_TX;
+    const aafont_t *f = k == ROLL_BPM ? TY_LB : TY_TX;  /* (the header's BPM: the label face, over the bank bar) */
     uint32_t e = (uint8_t)(ui.frame - ui.roll[k].t0) + 1u, i, p = 0;
     const char *a = ui.roll[k].from;
-    int32_t cy = k < ROLL_BPM ? y : 0, h = k < ROLL_BPM ? ROLL_H : H_HEAD;   /* (a card's value: at ROLL_Y) */
+    int32_t cy = k < ROLL_BPM ? y : 0, h = k < ROLL_BPM ? ROLL_H : BANK_Y;   /* (a card's value: at ROLL_Y; the
+                                                         * BPM: above the bank bar) */
     uint16_t bg = k < ROLL_BPM ? roll_bg : T_BG;
     char t[8], ch[2] = {0, 0};
     if (e >= ROLL_FRAMES)
@@ -200,14 +203,37 @@ static void head_pages(int32_t x, int32_t x1)          /* (x: after the transpor
         str_cpy(b + str_len(b), "/", 2);
         fmt_int(b + str_len(b), (int32_t)n);
         if (x + text_w(TY_LB, b) <= x1 - 4)
-            cv_text_on(x, ty_y(H_HEAD / 2, TY_LB), TY_LB, b, T_MID, T_BG);
+            cv_text_on(x, ty_y(HEAD_CY, TY_LB), TY_LB, b, T_MID, T_BG);
         return;
     }
     for (i = 0; i < n; i++) {                           /* a dot a page, the page's a pill */
         int32_t w = i == k ? 16 : 6;
-        cv_rrect(x, H_HEAD / 2 - 3, w, 6, 3, i == k ? T_THEME : T_LINE, T_BG);
+        cv_rrect(x, HEAD_CY - 3, w, 6, 3, i == k ? T_THEME : T_LINE, T_BG);
         x += w + 6;
     }
+}
+/* the bank bar: a line along the header's foot, filled as far as the selected track's sound is through its engine's
+ * factory sounds (the one browsing shows while PRESETS turns); a user or native slot: the line alone. The header's
+ * own row is HEAD_CY, above it */
+#define BANK_X 5
+#define BANK_W 230
+static uint32_t bank_fill(void)                         /* px of BANK_W, 0: none */
+{
+    uint32_t src, k, n;
+    if (browse_pending())
+        src = browse_shown(&k);
+    else
+        cur_entry(&src, &k);
+    if (src >= NENGINES || !(n = ENGINES[src]->npresets))
+        return 0;
+    k = (k + n - preset_init(src) % n) % n;             /* (the list's order: the engine's INIT first) */
+    return (k + 1u) * BANK_W / n;
+}
+static void draw_bank_bar(uint32_t fill)
+{
+    cv_rect(BANK_X, BANK_Y, BANK_W, 3, T_LINE);
+    if (fill)
+        cv_rect(BANK_X, BANK_Y, (int32_t)fill, 3, T_THEME);
 }
 /* the message (or the layer's name) does not fit the header from x: it goes under it as a toast (draw_toast) */
 static uint8_t toast_shown;                             /* the toast drawn (its place to give back when it goes) */
@@ -231,8 +257,9 @@ static void draw_head(void)
     uint32_t low = !(usb.config && !usb.suspended) && batt_level() <= 1, msg = ui.msg_t || ui.layer;
     uint32_t sig, moved = 0;
     int16_t bpm = song.g[G_BPM];                        /* (read once: what is noted is what is drawn) */
+    uint32_t fill = bank_fill();
     head_chip_text(chip);
-    sig = (uint32_t)seq_erase_active(TSEL) * 8191u + (uint32_t)song.playing * 3u + song.rec * 5u + song.rec_wait * 65537u + (uint32_t)(song.octave + 8) * 11u +
+    sig = fill * 2246822519u +  (uint32_t)seq_erase_active(TSEL) * 8191u + (uint32_t)song.playing * 3u + song.rec * 5u + song.rec_wait * 65537u + (uint32_t)(song.octave + 8) * 11u +
           song.sel * 13131u + (msg ? str_hash(7u, ui.msg_t ? ui.msg : layer_head()) : str_hash(5u, chip)) +
           (ui.bpm_t != 0) * 31u + low * 7777u + (chain.running ? (chain.row + 1u) * 104729u : 0u) + ux.gen * 977u +
           (ui.home ? ui.home_pg * 40503u : ui.page * 2654435761u) + page_sheet() * 524287u;
@@ -249,33 +276,33 @@ static void draw_head(void)
     fmt_int(b, bpm);
     if (!ui.force && sig == ui.head_sig) {
         if (ui.roll[ROLL_BPM].from[0] || moved) {       /* rolling, or snapped to the new value: the BPM's strip only */
-            cv_begin(BPM_W, H_HEAD, T_BG);
-            roll_text(ROLL_BPM, 0, ty_y(H_HEAD / 2, TY_TX), b, ui.bpm_t ? T_ACCENT : T_TEXT);
+            cv_begin(BPM_W, BANK_Y, T_BG);                /* (above the bank bar) */
+            roll_text(ROLL_BPM, 0, ty_y(HEAD_CY, TY_LB), b, ui.bpm_t ? T_ACCENT : T_TEXT);
             cv_blit(BPM_X, Y_HEAD);
         }
         return;
     }
     ui.head_sig = sig;
     cv_begin(240, H_HEAD, T_BG);
-    cv_icon_mid(5, H_HEAD / 2, 16, chain.running ? ICON_X_SONG : song.playing ? ICON_X_PLAY : ICON_X_STOP,
+    cv_icon_mid(5, HEAD_CY, 16, chain.running ? ICON_X_SONG : song.playing ? ICON_X_PLAY : ICON_X_STOP,
                 song.playing ? T_TEXT : T_MID, T_BG);
-    roll_text(ROLL_BPM, BPM_X, ty_y(H_HEAD / 2, TY_TX), b, ui.bpm_t ? T_ACCENT : T_TEXT);
+    roll_text(ROLL_BPM, BPM_X, ty_y(HEAD_CY, TY_LB), b, ui.bpm_t ? T_ACCENT : T_TEXT);
     x = BPM_X + BPM_W;                                  /* (past the widest BPM) */
     if (song.rec) {                                     /* (16 px, as the transport) */
-        cv_icon_mid(x, H_HEAD / 2, 16, ((song.rec & ~song.rec_wait) >> song.sel) & 1u ? ICON_X_REC : ICON_X_REC_O, T_REC, T_BG);
+        cv_icon_mid(x, HEAD_CY, 16, ((song.rec & ~song.rec_wait) >> song.sel) & 1u ? ICON_X_REC : ICON_X_REC_O, T_REC, T_BG);
         x += 18;
     }
     if (msg && head_toast(x + 6))                       /* (too long for the header: a toast under it, draw_toast; the
                                                          * header as it is) */
         msg = 0;
     if (seq_erase_active(TSEL)) {
-        cv_text_r(236, ty_y(H_HEAD / 2, TY_TX), TY_TX, "ERASING", T_REC, T_BG);
+        cv_text_r(236, ty_y(HEAD_CY, TY_TX), TY_TX, "ERASING", T_REC, T_BG);
     } else if (head_waiting()) {
-        cv_text_r(236, ty_y(H_HEAD / 2, TY_TX), TY_TX, "WAIT LOOP", T_REC, T_BG);
+        cv_text_r(236, ty_y(HEAD_CY, TY_TX), TY_TX, "WAIT LOOP", T_REC, T_BG);
     } else if (msg) {                                   /* a message, or the layer's name (may hold a keycap) */
-        cv_free_hint(x + 6, ty_y(H_HEAD / 2, TY_TX), ui.msg_t ? ui.msg : layer_head(), T_TEXT, T_BG, 236 - x - 6);
+        cv_free_hint(x + 6, ty_y(HEAD_CY, TY_TX), ui.msg_t ? ui.msg : layer_head(), T_TEXT, T_BG, 236 - x - 6);
     } else {
-        int32_t cw = text_w(TY_TX, chip) + 4;           /* (where you are: plain words in the track's colour;
+        int32_t cw = text_w(TY_LB, chip) + 4;           /* (where you are: plain words in the track's colour;
                                                          * PATTERNS plain, the grid is in colour) */
         if (song.octave) {                              /* the octave shift, signed, in an outlined pill ("+2") */
             int32_t w;
@@ -284,14 +311,14 @@ static void draw_head(void)
             w = text_w(TY_LB, b) + 12;
             cv_rrect(x + 2, 4, w, 22, 6, T_MID, T_BG);
             cv_rrect(x + 3, 5, w - 2, 20, 5, T_BG, T_MID);
-            cv_text_c(x + 2 + w / 2, ty_y(H_HEAD / 2, TY_LB), TY_LB, b, T_TEXT, T_BG);
+            cv_text_c(x + 2 + w / 2, ty_y(HEAD_CY, TY_LB), TY_LB, b, T_TEXT, T_BG);
             x += w + 8;
         }
         if (chain.running) {                            /* the song's row (where there is room) */
             str_cpy(b, "ROW ", 8);
             fmt_int(b + 4, (int32_t)chain.row + 1);
             if (x + 2 + text_w(TY_LB, b) + 6 <= 236 - cw - (low ? 22 : 0) - 6)
-                x = cv_text_on(x + 2, ty_y(H_HEAD / 2, TY_LB), TY_LB, b, T_MID, T_BG) + 6;
+                x = cv_text_on(x + 2, ty_y(HEAD_CY, TY_LB), TY_LB, b, T_MID, T_BG) + 6;
         }
         if (!ui.home) {                                 /* a page: where it is in its family */
             head_pages(x + 6, 236 - cw - (low ? 22 : 0));
@@ -300,15 +327,16 @@ static void draw_head(void)
             uint32_t i;
             for (i = 0, x += 6; i < 2u; i++) {
                 int32_t w = i == ui.home_pg ? 16 : 6;
-                cv_rrect(x, H_HEAD / 2 - 3, w, 6, 3, i == ui.home_pg ? T_THEME : T_LINE, T_BG);
+                cv_rrect(x, HEAD_CY - 3, w, 6, 3, i == ui.home_pg ? T_THEME : T_LINE, T_BG);
                 x += w + 6;
             }
         }
         if (low)                                        /* the battery, only when it runs low */
-            cv_icon_mid(236 - cw - 20, H_HEAD / 2, 16, batt_level() ? ICON_X_BAT1 : ICON_X_BAT0, T_REC, T_BG);
-        cv_text_r(236, ty_y(H_HEAD / 2, TY_TX), TY_TX, chip,
+            cv_icon_mid(236 - cw - 20, HEAD_CY, 16, batt_level() ? ICON_X_BAT1 : ICON_X_BAT0, T_REC, T_BG);
+        cv_text_r(236, ty_y(HEAD_CY, TY_LB), TY_LB, chip,
                   !ui.home && cur_page()->graph == GR_PATGRID && !ptc_on() ? T_MID : T_THEME, T_BG);
     }
+    draw_bank_bar(fill);
     cv_blit(0, Y_HEAD);
 }
 /* full redraw: the strips (header, cards, panel, footer; Stage: its panel and lanes) cover the rest; only the BG
@@ -1115,6 +1143,58 @@ static void draw_toast(void)
     cv_blit(BOX_X, H_HEAD + 2);
     toast_shown = 1;
 }
+/* the knob card: what a MIDI controller just changed (midi_control.c midi_pop_note), its track, name, value and a
+ * bar, over the middle of the page for CC_CARD_MS after the last change; the page comes back whole after */
+#define CC_CARD_MS 1200u
+#define CC_CARD_H 76
+#define CC_CARD_Y 88
+static struct { uint8_t seq, on, trk; uint16_t id; int16_t v; uint32_t t; } ccc;
+static void draw_cc_card(void)
+{
+    char val[24], lab[28];
+    const char *unit = 0;
+    int32_t fill = 0, w;
+    uint8_t q = midi_pop_seq;
+    if (q != ccc.seq) {
+        ccc.seq = q; ccc.trk = midi_pop_trk; ccc.id = midi_pop_id; ccc.v = midi_pop_v; ccc.t = fm1_ms; ccc.on = 1;
+    }
+    if (!ccc.on)
+        return;
+    if (fm1_ms - ccc.t >= CC_CARD_MS) {
+        ccc.on = 0;
+        ui.force = 1;
+        return;
+    }
+    lab[0] = 'T'; lab[1] = (char)('1' + ccc.trk % NTRK); lab[2] = ' '; lab[3] = 0;
+    if (ccc.id & MIDI_POP_NATIVE) {                     /* an engine's own envelope: 0..127 as % */
+        uint32_t cc = ccc.id & 127u;
+        str_cpy(lab + 3, cc == 73u ? "ATTACK" : cc == 75u ? "DECAY" : "RELEASE", 20);
+        fmt_int(val, (ccc.v * 100 + 63) / 127);
+        unit = "%";
+        fill = ccc.v * (BOX_W - 20) / 127;
+    } else if (ccc.id < P_COUNT) {
+        const track_t *t = &trk[ccc.trk % NTRK];
+        const param_desc_t *d = ccc.id < P_E0 ? &TP[ccc.id] : &ENGINES[eng_idx(t->eng_req)]->edit[ccc.id - P_E0];
+        str_cpy(lab + 3, d->label, 20);
+        param_format(d, ccc.v, val, &unit);
+        if (d->max > d->min)
+            fill = (ccc.v - d->min) * (BOX_W - 20) / (d->max - d->min);
+    } else {
+        return;
+    }
+    cv_begin(BOX_W, CC_CARD_H, T_BG);
+    cv_rrect(0, 0, BOX_W, CC_CARD_H, 8, T_LINE, T_BG);
+    cv_rrect(1, 1, BOX_W - 2, CC_CARD_H - 2, 7, T_SURF, T_LINE);
+    cv_text_on(10, ty_y(16, TY_LB), TY_LB, lab, T_MID, T_SURF);
+    w = cv_text_on(10, ty_y(42, TY_VL), TY_VL, val, T_TEXT, T_SURF);
+    if (unit && unit[0])
+        cv_text_on(w + 4, ty_y(46, TY_LB), TY_LB, unit, T_MID, T_SURF);
+    cv_rect(10, CC_CARD_H - 14, BOX_W - 20, 4, T_LINE);
+    if (fill > 0)
+        cv_rect(10, CC_CARD_H - 14, fill, 4, T_THEME);
+    GFX_HOOK_COVER(BOX_X, CC_CARD_Y, BOX_X + BOX_W, CC_CARD_Y + CC_CARD_H);
+    cv_blit(BOX_X, CC_CARD_Y);
+}
 static void ui_draw_frame(void);
 static void ui_draw(void)                               /* (gfx.c: the fills wait for the frame's canvases) */
 {
@@ -1223,6 +1303,7 @@ static void ui_draw_frame(void)
     }
     draw_page();
     draw_toast();
+    draw_cc_card();                                     /* a MIDI knob turned: what it changed */
     if (ui.msg_t && !--ui.msg_t && ui.msg2[0]) {     /* the second message (ui_notices) */
         str_cpy(ui.msg, ui.msg2, sizeof ui.msg);
         ui.msg2[0] = 0;

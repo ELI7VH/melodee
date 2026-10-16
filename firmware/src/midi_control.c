@@ -237,6 +237,19 @@ static int midi_track_held(uint32_t track)
     return 0;
 }
 
+/* what a controller just changed, for the knob card (ui_draw.c draw_cc_card): track, parameter (P_*, or
+ * MIDI_POP_NATIVE | CC for an engine's own envelope), value; seq moves on each change */
+#define MIDI_POP_NATIVE 0x8000u
+static volatile uint16_t midi_pop_id;
+static volatile int16_t midi_pop_v;
+static volatile uint8_t midi_pop_trk, midi_pop_seq;
+static void midi_pop_note(const track_t *t, uint32_t id, int32_t v)
+{
+    midi_pop_trk = (uint8_t)trk_index(t);
+    midi_pop_id = (uint16_t)id;
+    midi_pop_v = (int16_t)v;
+    midi_pop_seq++;
+}
 /* Native envelope loops run only for their CC, outside the audio IRQ's hot loops. */
 static __attribute__((noinline)) void midi_parameter(track_t *t,uint32_t cc,uint32_t value)
 {
@@ -264,14 +277,14 @@ static __attribute__((noinline)) void midi_parameter(track_t *t,uint32_t cc,uint
                 if(cz_ed_put(tr,LCZ_EBASE(line,2)+stage,99u-value*99u/127u,raw))memcpy(cz_patch[tr].raw,raw,128u);
             }
         }
-        motion_native_edited(t,old);motion_unguard(f);return;
+        motion_native_edited(t,old);motion_unguard(f);midi_pop_note(t,MIDI_POP_NATIVE|cc,(int32_t)value);return;
     }
     if(id>=P_COUNT)return;
     const param_desc_t *d=id<P_E0?&TP[id]:&ENGINES[t->eng_req]->edit[id-P_E0];
     if(d->max==d->min)return;
     int32_t v=d->min+(int32_t)(value*(uint32_t)(d->max-d->min)/127u);
     if(id==P_PAN)v=(int32_t)value-64;
-    t->p[id]=(int16_t)v;motion_capture(t,id,v);
+    t->p[id]=(int16_t)v;motion_capture(t,id,v);midi_pop_note(t,id,v);
 }
 /* MiniLab main encoder (controllers/MiniLab-3.md), any channel: CC114 turns (relative, 64 = still) browse the sounds of
  * the track selected on the FM-1, CC112 (Shift + turn) jumps engine to engine, CC115 (press) selects the next track.

@@ -33,6 +33,10 @@ change the track you are playing.
 
 Engines that do not list a knob ignore it.
 
+Every knob turn shows a card on the FM-1 for about a second: the track, the parameter and its value, with a bar.
+The line under the BPM and engine name at the top of the screen shows how far the selected sound is through its
+engine's factory sounds.
+
 The encoder rows need the WaveLoop build of Melodee (branch `waveloop/main` of this fork); stock Melodee ignores CC112–115.
 
 Melodee 1.2.1 has no effects, so there is nothing for CC91 / CC93 to do.
