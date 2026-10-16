@@ -244,6 +244,8 @@ def main(pkg, version, out, nightly=None, installer_only=False, rc=None, manual=
         for f in ("fukiai.ttf", "FUKIAI-LICENSE.txt", "fm1backup.js"):
             if (HERE / f).exists():
                 shutil.copy(HERE / f, ed / f)
+        if (HERE / "brand").exists():                   # WaveLoop fork: UltraKit (ultrakit.css, Micro 5, Finlandica + OFL)
+            shutil.copytree(HERE / "brand", ed / "brand", dirs_exist_ok=True)
         (out / "index.html").write_text(
             '<!doctype html><meta charset="utf-8"><title>Melodee</title>'
             '<meta http-equiv="refresh" content="0; url=webapp/installer/">'

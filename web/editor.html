@@ -9,7 +9,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Melodee Editor</title>
+<title>WaveLoop · Melodee Editor</title>
+<link rel="stylesheet" href="brand/ultrakit.css">
 <style>
   /* Fukiai: Hügelton Instruments' icon font (MIT, FUKIAI-LICENSE.txt). Icons are text in .ic spans;
      they stay hidden until the face has loaded (html.fk), so a missing font never shows boxes. */
@@ -167,13 +168,57 @@
   .site .links a { color: var(--dim); text-decoration: none; }
   .site .links a:hover { color: var(--fg); }
   .site .links a[aria-current="page"] { color: var(--fg); }
+  /* WaveLoop fork: UltraKit (brand/ultrakit.css, generated in the kit): colour, faces and the rules - a lit control is a
+     fill, state is a fill not a border. Light follows the system (or Settings); the editor's own variables map onto it. */
+  @font-face { font-family: "Micro 5"; src: url("brand/Micro5-Regular.woff2") format("woff2"); font-display: swap; }
+  @font-face { font-family: "Finlandica"; src: url("brand/Finlandica.woff2") format("woff2"); font-weight: 400 700; font-display: swap; }
+  :root { --bg: var(--uk-foam); --fg: var(--uk-ground); --dim: var(--uk-primary-dim); --line: var(--uk-primary);
+          --surf: var(--uk-primary-top); --lit: var(--uk-ground); --on-lit: var(--uk-foam); }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: var(--uk-ground); --fg: var(--uk-text); --line: var(--uk-primary-dim);
+      --dim: color-mix(in srgb, var(--uk-primary) 45%, var(--uk-muted)); --surf: var(--uk-surface);
+      --lit: var(--uk-primary-top); --on-lit: var(--uk-ground); }
+  }
+  :root[data-theme="dark"] { --bg: var(--uk-ground); --fg: var(--uk-text); --line: var(--uk-primary-dim);
+    --dim: color-mix(in srgb, var(--uk-primary) 45%, var(--uk-muted)); --surf: var(--uk-surface);
+    --lit: var(--uk-primary-top); --on-lit: var(--uk-ground); }
+  body { font: 14px/1.45 var(--uk-font-body); }
+  button { background: var(--lit); color: var(--on-lit); padding: 4px 12px; }
+  select, input[type=text], input[type=number], input[type=search] { background: var(--surf); border: 0; padding: 3px 6px; }
+  input[type=range], input[type=checkbox] { accent-color: var(--fg); }
+  h2 { border-bottom: 0; font-size: 14px; }
+  .site { border-bottom: 0; align-items: center; }
+  .site .brand { display: flex; align-items: baseline; gap: 10px; font: 600 15px/1 var(--uk-font-body); color: var(--dim); }
+  .site .brand .wm { font: 40px/.85 var(--uk-font-brand); text-transform: uppercase; color: var(--fg); letter-spacing: .02em; }
+  .tabs { border-bottom: 0; gap: 4px; }
+  .tabs button { background: var(--surf); color: var(--dim); border: 0; padding: 6px 12px; }
+  .tabs button[aria-selected="true"] { background: var(--lit); color: var(--on-lit); }
+  .seg { gap: 4px; }
+  .seg button, button.tog { background: var(--surf); border: 0; }
+  .seg button + button { border-left: 0; }
+  .seg button[aria-pressed="true"], button.tog[aria-pressed="true"] { background: var(--lit); color: var(--on-lit); }
+  /* PARAMS: every engine and every parameter that can change, from the editor's own tables (as the firmware's) */
+  #p-params .intro { color: var(--dim); margin: 0 0 10px; }
+  #p-params .pfilter { width: min(100%, 320px); margin: 0 0 12px; }
+  #params details { background: var(--surf); margin: 0 0 8px; padding: 6px 12px; }
+  #params summary { cursor: pointer; font-weight: 600; }
+  #params summary .n { color: var(--dim); font-weight: 400; margin-left: 8px; }
+  #params .pt { font: 13px/1.5 var(--uk-font-body); width: 100%; margin: 6px 0 4px; }
+  #params .pt td { padding: 2px 10px 2px 0; vertical-align: top; }
+  #params .pt { table-layout: fixed; }
+  #params .pt td.k { white-space: nowrap; font-weight: 600; width: 190px; }
+  #params .pt td.d { width: 110px; }
+  #params .pt td.r { color: var(--dim); }
+  #params .pt td.d { color: var(--dim); white-space: nowrap; text-align: right; }
+  #params .pg { color: var(--dim); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; padding-top: 8px; }
+  #params .ctl { display: inline-block; margin-left: 6px; padding: 0 5px; font-size: 11px; background: var(--lit); color: var(--on-lit); }
 </style>
 </head>
 <body>
 <main>
   <button class="lang" id="lang"></button>
   <nav class="site">
-    <span class="brand">Melodee</span>
+    <span class="brand"><span class="wm">WaveLoop</span>Melodee</span>
     <div class="links">
       <a href="../editor/" aria-current="page">Patch Editor</a>
       <a href="../installer/">Installer</a>
@@ -197,6 +242,7 @@
       <button role="tab" data-tab="tracks" data-t="tabTracks" data-ic="ui_slider_vertical"></button>
       <button role="tab" data-tab="library" data-t="library" data-ic="symbol_books"></button>
       <button role="tab" data-tab="projects" data-t="projects" data-ic="symbol_folder"></button>
+      <button role="tab" data-tab="params" data-t="tabParams" data-ic="ui_knob"></button>
       <button role="tab" data-tab="settings" data-t="tabSettings" data-ic="symbol_cog"></button>
     </nav>
     <div class="trackbar" id="trackbar" hidden><span class="dim" data-t="track"></span><span class="seg" id="trackbtns" role="group"></span></div>
@@ -373,6 +419,12 @@
         <button id="songremove" data-t="songRemove"></button><span id="songstatus" aria-live="polite"></span></p>
       <div id="songrows"></div>
     </div>
+  </section>
+
+  <section class="panel" id="p-params" data-tab="params" hidden>
+    <p class="intro" data-t="paramsIntro"></p>
+    <input type="search" class="pfilter" id="pfilter" aria-label="Filter">
+    <div id="params"></div>
   </section>
 
   <section class="panel" id="p-settings" data-tab="settings" data-dev hidden>
@@ -2968,7 +3020,9 @@ const TEXT = {
     loadedUser: "音色を読み込みました（シーケンスはそのまま。パターンは本体の SEQ > PHRASES から。SAVE 長押しで元に戻せます）: ", reloaded: "本体で音色が変わったので読み直しました", readingBank: "スロットを読み込み中",
     badEngine: "このファームウェアにないエンジンです: ", flashFail: "書き込みに失敗しました（rc {rc}）",
     installer: "Melodee インストーラー",
-    tabSeq: "シーケンサー", tabTracks: "トラック", tabSettings: "設定",
+    tabSeq: "シーケンサー", tabTracks: "トラック", tabSettings: "設定", tabParams: "パラメーター",
+    paramsIntro: "全エンジンの変更できるパラメーターと範囲。タグは MiniLab / Oxygen のどのコントロールで動かせるかを示します。",
+    paramsTrack: "全トラック（全エンジン）", paramsGlobal: "グローバル", paramsNative: "ネイティブ・プログラム", paramsOwnEnv: "独自エンベロープ（K5 K6 K8）",
     needDevice: "FM-1 を接続すると編集できます。", smpNone: "このファームウェアにはユーザーサンプルのスロットがありません。",
     bankConnect: "FM-1 を接続すると本体のユーザープリセットも扱えます。", bankNone: "このファームウェアにはユーザープリセットがありません。",
     mixer: "ミキサー", mixHelp: "本体の MIXER ページと同じ 4 トラック。フェーダーはレベル。パンはどのトラックも選択を変えずに書き込みます（0.8 のファームウェアでは一瞬そのトラックを選びます）。REC は本体での録音待機の表示です。",
@@ -3062,7 +3116,9 @@ const TEXT = {
     loadedUser: "Sound loaded (the sequence stays; its pattern is on the device under SEQ > PHRASES; hold EDIT to undo): ", reloaded: "The sound changed on the device: read again", readingBank: "Reading the slots",
     badEngine: "This firmware has no such engine: ", flashFail: "Write failed (rc {rc})",
     installer: "Melodee installer",
-    tabSeq: "Sequencer", tabTracks: "Tracks", tabSettings: "Settings",
+    tabSeq: "Sequencer", tabTracks: "Tracks", tabSettings: "Settings", tabParams: "Parameters",
+    paramsIntro: "Every engine and every parameter that can change, with its range. The tag names the MiniLab / Oxygen control that reaches it.",
+    paramsTrack: "Every track (all engines)", paramsGlobal: "Global", paramsNative: "native program", paramsOwnEnv: "its own envelope (K5 K6 K8)",
     needDevice: "Connect the FM-1 to edit.", smpNone: "This firmware has no user sample slots.",
     bankConnect: "Connect the FM-1 to see its user presets too.", bankNone: "This firmware has no user presets.",
     mixer: "Mixer", mixHelp: "The four tracks of the device's MIXER page. The fader is the level. Pan is written to any track without changing the selection (firmware 0.8: by selecting it for a moment). REC shows a track armed for live recording on the device.",
@@ -3095,7 +3151,7 @@ $("lang").addEventListener("click", () => { lang = lang === "ja" ? "en" : "ja"; 
 
 /* ---------------------------------------------------------------- tabs --- */
 /* one panel at a time; the last one is remembered (localStorage) and in the URL hash (#sound ...) */
-const TABS = ["sound", "fm6", "sequencer", "tracks", "library", "projects", "settings"];
+const TABS = ["sound", "fm6", "sequencer", "tracks", "library", "projects", "params", "settings"];
 const TAB_KEY = "felucca-editor-tab";
 const TRACK_TABS = new Set(["sound", "sequencer", "tracks"]);
 let tab = (() => {
@@ -3105,6 +3161,76 @@ let tab = (() => {
   return "sound";
 })();
 const hasTracks = () => !!dev && !!dev.info && !!dev.info.ntrk;
+/* PARAMS (WaveLoop fork): every engine and every parameter that can change, from the mock device's tables (test_web.mjs
+ * holds them equal to the firmware's), so it works without an FM-1. A tag names the controller knob that reaches it
+ * (controllers/: the MiniLab and Oxygen presets; firmware midi_control.c midi_cc_id). Built once, filtered as you type. */
+let paramsBuilt = false;
+function renderParams() {
+  if (paramsBuilt) return;
+  paramsBuilt = true;
+  const md = makeMockDevice({ auto: false }); md.stop();
+  const { TP, GP, ENG } = md.tables;
+  const UNIT = { [F.TIME]: " time", [F.LFOHZ]: " Hz", [F.CUTOFF]: " cutoff", [F.DB]: " dB",
+    [F.SEMI]: " st", [F.BPM]: " BPM", [F.NOTE]: " note", [F.OCT]: " oct", [F.STEPS]: " steps", [F.TONE]: " tone" };
+  const esc = (x) => String(x).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const range = (d) => {
+    if (d.names && d.names.length) {
+      const n = d.names.filter((x) => x && x !== "-");
+      return n.length > 14 ? n.slice(0, 12).join(" · ") + " … +" + (n.length - 12) : n.join(" · ");
+    }
+    if (d.fmt === F.PCT) return Math.round(d.min * 100 / 127) + " – " + Math.round(d.max * 100 / 127) + "%";
+    if (d.fmt === F.BIPCT) return "−100 – +100%";
+    return d.min + " – " + d.max + (d.unit ? " " + d.unit : UNIT[d.fmt] || "");
+  };
+  const def = (d) => d.names && d.names[d.def] != null ? d.names[d.def] :
+    d.fmt === F.PCT ? Math.round(d.def * 100 / 127) + "%" : d.fmt === F.BIPCT ? Math.round(d.def * 100 / 64) + "%" : d.def;
+  const row = (label, d, tag) => `<tr><td class="k">${esc(label)}${tag ? `<span class="ctl">${tag}</span>` : ""}</td>` +
+    `<td class="r">${esc(range(d))}</td><td class="d">${esc(def(d))}</td></tr>`;
+  /* CC74 (K1) / CC71 (K2): the engine parameter each reaches, as midi_cc_id's table (high nibble 74, low 71) */
+  const KMAP = { 3: 0x56, 10: 0x30, 11: 0x34, 12: 0x30, 19: 0x12 };
+  const NATIVE_ENV = new Set([12, 15, 19]);   /* FM6, CZ-1, PROPHET: their own envelopes */
+  let html = "";
+  ENG.forEach((e, ei) => {
+    if (!e.name || e.name === "-") return;
+    const m = KMAP[ei] || 0, k1 = (m >> 4) - 1, k2 = (m & 15) - 1;
+    let rows = "", n = 0;
+    e.edit.forEach((d, i) => {
+      if (i % 4 === 0) rows += `<tr><td class="pg" colspan="3">${esc((e.titles || [])[i >> 2] || "")}</td></tr>`;
+      if (!d || !d.label || d.label === "-") return;
+      n++;
+      rows += row(d.label, d, i === k1 ? "K1" : i === k2 ? "K2" : "");
+    });
+    let native = "";
+    if (ei === 19 && P5.FIELDS) {
+      native = `<tr><td class="pg" colspan="3">${esc(t("paramsNative"))} · ${P5.FIELDS.length}</td></tr>` +
+        P5.FIELDS.map((f) => row(f.label, { min: f.min, max: f.max, def: f.min }, "")).join("");
+      n += P5.FIELDS.length;
+    }
+    html += `<details><summary>${esc(e.name)}<span class="n">${n}${NATIVE_ENV.has(ei) ? " · " + esc(t("paramsOwnEnv")) : ""}</span></summary>` +
+      `<table class="pt">${rows}${native}</table></details>`;
+  });
+  const TAGS = { LVL: "FADER", ATK: "K5", DEC: "K6", SUS: "K7", REL: "K8", GLD: "K3", PAN: "K4" }, seen = new Set();
+  const list = (P) => P.map((d) => {
+    if (!d || !d.label || d.label === "-") return "";
+    const tag = TAGS[d.label] && !seen.has(d.label) ? (seen.add(d.label), TAGS[d.label]) : "";
+    return row(d.label, d, tag);
+  }).join("");
+  html += `<details><summary>${esc(t("paramsTrack"))}<span class="n">${TP.filter((d) => d && d.label).length}</span></summary><table class="pt">${list(TP)}</table></details>`;
+  html += `<details><summary>${esc(t("paramsGlobal"))}<span class="n">${GP.filter((d) => d && d.label).length}</span></summary><table class="pt">${list(GP)}</table></details>`;
+  $("params").innerHTML = html;
+  $("pfilter").addEventListener("input", () => {
+    const q = $("pfilter").value.trim().toLowerCase();
+    for (const det of $("params").querySelectorAll("details")) {
+      let any = !q || det.querySelector("summary").textContent.toLowerCase().includes(q);
+      for (const tr of det.querySelectorAll("tr")) {
+        if (tr.querySelector(".pg")) continue;
+        const hit = !q || any || tr.textContent.toLowerCase().includes(q);
+        tr.hidden = !hit; if (hit) any = true;
+      }
+      det.hidden = !any; if (q && any) det.open = true;
+    }
+  });
+}
 function showTab(name) {
   if (!TABS.includes(name)) name = "sound";
   const prev = tab;
@@ -3112,6 +3238,7 @@ function showTab(name) {
   try { localStorage.setItem(TAB_KEY, name); } catch (e) { /* no storage */ }
   if (location.hash !== "#" + name) history.replaceState(null, "", location.pathname + location.search + "#" + name);
   renderPanels();
+  if (name === "params") renderParams();
   if (name === "tracks" && prev !== "tracks" && hasTracks() && dev.dump) op(readMixer);
   if (name === "fm6" && prev !== "fm6" && dev && dev.dump && dev.info.fm6) op(fm6Refresh);
 }
