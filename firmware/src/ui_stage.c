@@ -263,11 +263,36 @@ static void stage_panel_hits(void)                      /* every frame: the DRUM
         stage.hit_t[l] = (f[sel] >> l) & 1u ? 10u : stage.hit_t[l] ? stage.hit_t[l] - 1u : 0u;
 }
 /* the band: the selected track's waveform, faint, the chord and notes in front (a DRUM track: its lanes) */
+static uint32_t song_count(uint32_t *pos);              /* resume_sounds.c (WaveLoop fork) */
+static void song_name(char *b);
 static void stage_band(void)
 {
-#if WAVELOOP_STAGE_BAND_EMPTY                           /* WaveLoop fork: the band kept clear (no notes, chord or wave) */
-    cv_begin(240, ST_BAND_H, T_BG);
-    cv_blit(0, ST_BAND_Y);
+#if WAVELOOP_STAGE_BAND_EMPTY                           /* WaveLoop fork: the band is the set list: SONG 2/3, its name,
+                                                         * OCT -/+ to step (no notes, chord or wave) */
+    {
+        static uint32_t sig;
+        char s[16], name[16];
+        uint32_t pos, n = song_count(&pos), h;
+        str_cpy(s, "SONG 1/1", sizeof s);
+        s[5] = (char)('0' + pos);
+        s[7] = (char)('0' + n);
+        if (pos) {
+            song_name(name);
+        } else {                                        /* not saved yet: it takes a slot once it changes */
+            str_cpy(s, "NEW SONG", sizeof s);
+            str_cpy(name, "0 SAVED", sizeof name);
+            name[0] = (char)('0' + n);
+        }
+        h = str_hash(str_hash(7u + ux.gen * 977u + ux.pal * 31u, s), name);
+        if (!ui.force && h == sig)
+            return;
+        sig = h;
+        cv_begin(240, ST_BAND_H, T_BG);
+        int32_t x = cv_text_on(BOX_X + 2, ty_y(15, TY_LB), TY_LB, s, T_TEXT, T_BG) + 8;
+        cv_free_text(x, ty_y(15, TY_LB), TY_LB, name, T_MID, T_BG, 240 - x - 64);
+        cv_text_r(240 - BOX_X - 2, ty_y(15, TY_LB), TY_LB, "OCT -/+", T_DIM, T_BG);
+        cv_blit(0, ST_BAND_Y);
+    }
     return;
 #endif
     uint32_t sel = song.sel % NTRK, drum = (uint32_t)drum_track(TSEL), i;

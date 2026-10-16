@@ -535,7 +535,8 @@ Thanks to [@aroum](https://github.com/aroum) for the detailed feedback in
   SEQ + pattern-key shortcuts arm one pass and automatically disarm at its end. While stopped and armed, the first
   key or MIDI note starts playback and records from step zero, skipping count-in.
   **REC + PLAY** arms and starts in one gesture, keeping recording active across loops
-- On Stage, OCT− / OCT+ shift the octave (both: reset). Everywhere else OCT+ enters, opens or
+- On Stage, OCT− / OCT+ step to the previous / next saved song (the WaveLoop build; the bottom line shows SONG 2/3
+  and its name). The song you leave is saved first, tweaks and all. Stop first. Both together: octave reset. Everywhere else OCT+ enters, opens or
   confirms and OCT− goes back. During synth step editing they move the step cursor
 - Save a sound: stop, tap SAVE, choose USER and a slot, press OCT+ to open its sheet with
   **Save here** selected, then OCT+ again (name it with the keys)

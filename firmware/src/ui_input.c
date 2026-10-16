@@ -43,7 +43,7 @@ static uint32_t cur_fam(void)                       /* (an engine's own envelope
 }
 
 static int layer_set_open(void);                       /* (ui_layer.c) */
-/* OCT- / OCT+ shift the octave on Stage (HOME) only; everywhere else, and over Stage's menu, dialogs and popups,
+/* OCT- / OCT+ step the songs on Stage (HOME) only (WaveLoop fork, resume_sounds.c song_step; upstream: the octave); everywhere else, and over Stage's menu, dialogs and popups,
  * they are Esc / Enter (docs/design/README.md, Navigation) */
 static int oct_nav(void)
 {
@@ -705,6 +705,7 @@ static void jam_take(void)
 #define AUTOSAVE_MS 5000u
 static void project_autosave(void);
 static void resume_save(void);                          /* resume_sounds.c (WaveLoop fork) */
+static void song_step(int dir);
 static void autosave_poll(uint32_t active)
 {
     static uint32_t t0, rx;
@@ -1265,8 +1266,8 @@ static void act_do(void)
 /* OCT- / OCT+ as Esc / Enter (oct_nav): on release, and only a press that began there; both down together
  * (UPDATE MODE, main.c) is no tap. Bit 0 OCT-, bit 1 OCT+ */
 static uint8_t oct_eat;                                 /* OCT taps not to come (held for a sheet, used in a combo) */
-static uint8_t oct_deferred;                            /* OCT+ pressed on Stage (its sheet when held): the octave on
-                                                         * release */
+static uint8_t oct_deferred;                            /* OCT+ pressed on Stage (its sheet when held): the next song
+                                                         * on release */
 static uint32_t oct_taps(uint32_t pressed, int here)
 {
     static uint8_t down, chord;
@@ -2035,7 +2036,8 @@ static void ui_input(void)
         oct_deferred = 0;
         if(bulk_context())ui.bulk_hold=1;else page_sheet_open();
     } else if (octup == BT_TAP && oct_deferred) {
-        song.octave += song.octave < 3 ? 1 : 0;         /* (OCT+ pressed on a page with a sheet: on release) */
+        song_step(1);                                   /* (OCT+ on Stage, its sheet when held: on release; WaveLoop fork:
+                                                         * the next song, not the octave) */
     }
     if (octup != BT_NONE || !((fm1_in.buttons >> panel.btn[B_OCTUP]) & 1u))
         oct_deferred = 0;
@@ -2331,8 +2333,8 @@ static void ui_input(void)
                 oct_deferred = 0;
             } else if (b == B_OCTUP && page_sheet() == 1u) {
                 oct_deferred = 1;                       /* Stage: OCT+ on release, held: the sound's sheet */
-            } else {
-                song.octave += b == B_OCTDN ? (song.octave > -3 ? -1 : 0) : (song.octave < 3 ? 1 : 0);
+            } else {                                    /* WaveLoop fork: HOME's OCT- / OCT+ step the songs */
+                song_step(b == B_OCTDN ? -1 : 1);
             }
             break;
         }

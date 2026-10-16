@@ -767,7 +767,8 @@ static int test_actions(void)
     track_t *t = &trk[0];
     ui_power_on();
     press(B_OCTUP);
-    bad += check("HOME: OCT+ shifts the octave (lit)", song.octave == 1 && oct_leds() == 2u);
+    bad += check("HOME: OCT+ the next song (WaveLoop fork), not the octave", song.octave == 0 && ui.msg_t);
+    song.octave = 1;
     my_steps(t);
     go_title("PATTERN");                          /* (a page off Stage) */
     fm1_in.buttons |= 1u << panel.btn[B_OCTUP];   /* both together (the UPDATE MODE hold): nothing */
@@ -788,9 +789,9 @@ static int test_actions(void)
     go_title("PATTERN");
     fm1_in.buttons &= ~(1u << panel.btn[B_OCTUP]);
     frame();
-    bad += check("a press that began elsewhere does nothing there", !pop.on && song.octave == 2 && !ui.home);
+    bad += check("a press that began elsewhere does nothing there", !pop.on && song.octave == 1 && !ui.home);
     press(B_OCTDN);
-    bad += check("PATTERN: OCT- goes HOME (the octave stays)", ui.home && song.octave == 2);
+    bad += check("PATTERN: OCT- goes HOME (the octave stays)", ui.home && song.octave == 1);
     /* TOOLS is gone: Clear pattern in the pattern's sheet, Init sound in the sound's */
     for (i = 0; i < NPAGES; i++)
         found |= str_eq(PAGES[i].title, "TOOLS");
@@ -921,6 +922,8 @@ static int test_track_count(void)
     for (n = 0; n < 4u; n++) {
         hold(B_OCTUP);
         sheet_do("Add track");
+        if (msg_is("TRACKS FULL"))
+            break;                                      /* (OCT- on Stage is the previous song: WaveLoop fork) */
         press(B_OCTDN);
     }
     bad += check("  four at most (TRACKS FULL)", trk_n() == NTRK && msg_is("TRACKS FULL"));
@@ -2270,7 +2273,7 @@ static int test_native_env_lfo(void)
     press(B_OCTDN);
     bad += check("OCT- on a sound page: Stage, no octave", ui.home && song.octave == o);
     press(B_OCTDN);
-    bad += check("OCT- on Stage: an octave down", ui.home && song.octave == o - 1);
+    bad += check("OCT- on Stage: the previous song (WaveLoop fork), the octave stays", ui.home && song.octave == o);
     go_title("SCALES");
     press(B_OCTDN);
     bad += check("OCT- on SCALES: back to SCL's list", !ui.home && str_eq(cur_page()->title, "SCL"));
@@ -5343,6 +5346,26 @@ static int test_resume_sounds(void)
     resume_load();                                      /* (power-on) */
     bad += check("  power-on loads it: track 2 SID preset 4 again, its tweak (ATK 77) too", proj_cur < 4u && trk[1].eng_req == 3u &&
                  trk[1].preset == 3u && trk[1].p[P_ATK] == 77);
+    {                                                   /* the set list: OCT- / OCT+ on HOME step the songs */
+        uint32_t first = proj_cur, pos, n;
+        go_home();
+        project_new_blank();                            /* a second song, changed: it takes a slot as it is left */
+        set_engine_of(&trk[0], 3u); apply_preset_to(&trk[0], 5); trk[0].engine = trk[0].eng_req;
+        rs_start_hash = 1;
+        press(B_OCTDN);
+        n = song_count(&pos);
+        bad += check("  OCT- on HOME: the new song kept (two songs), the first back with its tweak (ATK 77)",
+                     n == 2u && proj_cur == first && pos == 1u && trk[1].p[P_ATK] == 77 && msg_is("SONG 1/2 "));
+        press(B_OCTUP);
+        bad += check("  OCT+: the second, as it was left (track 1 SID preset 6), the band says SONG 2/2",
+                     proj_cur != first && song_count(&pos) == 2u && pos == 2u && trk[0].preset == 5u);
+        trk[0].p[P_ATK] = 99;                           /* (a tweak not saved yet: kept on the way out) */
+        press(B_OCTUP);
+        bad += check("  OCT+ past the last: round to the first", proj_cur == first);
+        press(B_OCTDN);
+        bad += check("  OCT- back: the second with the tweak made before leaving it (ATK 99)", proj_cur != first && trk[0].p[P_ATK] == 99);
+        bad += check("  the octave never moved", song.octave == 0);
+    }
     favorites.factory[RS_ROW][0] = 0;
     memset(proj_slot, 0, sizeof proj_slot);
     memset(proj_bank_slot, 0, sizeof proj_bank_slot);
