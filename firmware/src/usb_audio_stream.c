@@ -8,6 +8,7 @@
  * capture packet lengths and the playback endpoint's explicit 10.14 feedback.
  * USB and I2S both run at the native 44.1 kHz rate; no resampler is needed. */
 #include <stdint.h>
+#include "wl_mix.h"
 #define UA_RATE 44100u
 #define UA_CAP_CHANNELS 4u                    /* maximum; active stride follows the enumerated mode */
 static uint8_t ua_cap_channels = 2u;
@@ -50,6 +51,7 @@ static const uint16_t ua_volume_gain[65] = {
 static int16_t ua_host_volume_q8;
 static uint8_t ua_host_mute;
 static int32_t ua_host_target_q15 = 32768, ua_host_gain_q15 = 32768;
+static int32_t ua_dev_q15 = 32768, ua_sys_q15 = 32768;   /* WaveLoop fork: the monitor crossfade (core.h wl_mix), ramped */
 
 static void ua_host_volume_reset(void)
 {
@@ -218,6 +220,7 @@ static void ua_audio(int32_t *out, const int32_t *tracks, uint32_t n, uint32_t m
             }
         }
     }
+    int32_t dev = ua_dev_q15, sys = ua_sys_q15, dev_to = wl_mix_q15(wl_mix, 0), sys_to = wl_mix_q15(wl_mix, 1);
     for (i = 0; i < n; i++) {
         uint32_t ci = ((ua.cw + i) & (UA_RING - 1u)) * ua_cap_channels;
         uint32_t pi = ((ua.pr + i) & (UA_RING - 1u)) * 2u;
@@ -231,14 +234,25 @@ static void ua_audio(int32_t *out, const int32_t *tracks, uint32_t n, uint32_t m
                 for (ch = 0; ch < UA_CAP_CHANNELS; ch++)
                     ua.cap[ci + ch] = (int16_t)ua_clip(tracks[i * UA_CAP_CHANNELS + ch]);
         }
+        if (dev != dev_to || sys != sys_to) {      /* the crossfade, ~3 ms end to end as the host volume */
+            int32_t dd = dev_to - dev, ds = sys_to - sys;
+            dev += dd > 256 ? 256 : dd < -256 ? -256 : dd;
+            sys += ds > 256 ? 256 : ds < -256 ? -256 : ds;
+        }
+        if (dev != 32768) {                       /* (after capture: a recording keeps the FM-1 whole) */
+            l = (int32_t)(((int64_t)l * dev) >> 15);
+            r = (int32_t)(((int64_t)r * dev) >> 15);
+            out[2u * i] = l;
+            out[2u * i + 1u] = r;
+        }
         if (playback) {
             if (gain != target) {            /* at most 128 samples (~3 ms) for a full-scale change */
                 int32_t delta = target - gain;
                 gain += delta > 256 ? 256 : delta < -256 ? -256 : delta;
                 play_gain_q15 = (master_q12 * (uint32_t)gain) >> 12;
             }
-            l += (ua.play[pi] * (int32_t)play_gain_q15) >> 15;
-            r += (ua.play[pi + 1u] * (int32_t)play_gain_q15) >> 15;
+            l += (((ua.play[pi] * (int32_t)play_gain_q15) >> 15) * sys) >> 15;
+            r += (((ua.play[pi + 1u] * (int32_t)play_gain_q15) >> 15) * sys) >> 15;
             out[2u * i] = ua_clip(l);
             out[2u * i + 1u] = ua_clip(r);
         }
@@ -248,4 +262,6 @@ static void ua_audio(int32_t *out, const int32_t *tracks, uint32_t n, uint32_t m
     if (playback)
         ua.pr += n;
     ua_host_gain_q15 = playback ? gain : target; /* opening a muted stream never starts at unity */
+    ua_dev_q15 = dev;
+    ua_sys_q15 = sys;
 }

@@ -1173,6 +1173,15 @@ static void draw_cc_card(void)
         fmt_int(val, (ccc.v * 100 + 63) / 127);
         unit = "%";
         fill = ccc.v * (BOX_W - 20) / 127;
+    } else if (ccc.id == MIDI_POP_MIX) {                /* the monitor crossfade: the computer's share, the FM-1's */
+        char *e;
+        str_cpy(lab, "MIX  COMPUTER / FM-1", 28);
+        fmt_int(val, wl_mix_pct(ccc.v, 1));
+        e = val + str_len(val);
+        str_cpy(e, " / ", 8);
+        fmt_int(e + 3, wl_mix_pct(ccc.v, 0));
+        unit = "%";
+        fill = ccc.v * (BOX_W - 20) / 127;
     } else if (ccc.id < P_COUNT) {
         const track_t *t = &trk[ccc.trk % NTRK];
         const param_desc_t *d = ccc.id < P_E0 ? &TP[ccc.id] : &ENGINES[eng_idx(t->eng_req)]->edit[ccc.id - P_E0];

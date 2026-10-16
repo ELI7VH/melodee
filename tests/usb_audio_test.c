@@ -63,6 +63,34 @@ static void routing(void)
     assert(!ua.play_alt && !ua.cap_alt && ua.pw == ua.pr && ua.cw == ua.cr);
 }
 
+/* WaveLoop fork: fader 9 (wl_mix) crossfades the FM-1 against the computer; capture keeps the FM-1 whole */
+static void crossfade(void)
+{
+    uint8_t packet[UA_PACKET];
+    int32_t out[64];
+    uint32_t i, k;
+    static const struct { uint8_t x; int32_t l; } want[] = {
+        {0, 2000}, {64, 3000}, {127, 1000},             /* computer alone, both full, FM-1 alone */
+    };
+    for (k = 0; k < 3; k++) {
+        memset(&ua, 0, sizeof ua);
+        ua_reset();
+        ua.play_alt = ua.cap_alt = 1;
+        pcm(packet, 32, 2000, -2000);
+        for (i = 0; i < 64; i++)
+            ua_receive(packet, 128);
+        wl_mix = want[k].x;
+        for (i = 0; i < 8; i++)                         /* (the ramp settles: 256 per sample) */
+            block(1000, -1000, 4096, out);
+        assert(out[0] == want[k].l && out[1] == -want[k].l);
+        assert(ua.cap[((ua.cw - 32u) & (UA_RING - 1u)) * ua_cap_channels] == 1000);   /* recorded whole */
+    }
+    assert(wl_mix_q15(32, 0) == 16384 && wl_mix_q15(32, 1) == 32768);  /* the FM-1 half way down, the computer full */
+    assert(wl_mix_pct(64, 0) == 100 && wl_mix_pct(64, 1) == 100);
+    wl_mix = 64;
+    ua_dev_q15 = ua_sys_q15 = 32768;
+}
+
 /* Model a host honoring feedback every 16 ms, with independent I2S clock and
  * the real 256-frame render bursts. Exercise both clock drift directions and
  * each stream alone: playback feedback cannot depend on capture being open. */
@@ -283,6 +311,7 @@ int main(void)
 {
     ua_cap_channels = 4;
     routing();
+    crossfade();
     recovery();
     pcm24();
     for (int alt = 1; alt <= 2; alt++) {

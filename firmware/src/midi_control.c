@@ -240,6 +240,7 @@ static int midi_track_held(uint32_t track)
 /* what a controller just changed, for the knob card (ui_draw.c draw_cc_card): track, parameter (P_*, or
  * MIDI_POP_NATIVE | CC for an engine's own envelope), value; seq moves on each change */
 #define MIDI_POP_NATIVE 0x8000u
+#define MIDI_POP_MIX 0x4000u                     /* WaveLoop fork: the monitor crossfade (CC8), value 0..127 */
 static volatile uint16_t midi_pop_id;
 static volatile int16_t midi_pop_v;
 static volatile uint8_t midi_pop_trk, midi_pop_seq;
@@ -320,6 +321,10 @@ static void midi_control(uint32_t ch, uint32_t cc, uint32_t value)
     track_t *t = midi_track(ch);
     if (t) midi_parameter(t,cc,value);
     midi_encoder_cc(cc, value);
+    if (cc == WL_MIX_CC) {                         /* the monitor crossfade, the card says where it is */
+        wl_mix = (uint8_t)value;
+        midi_pop_trk = 0; midi_pop_id = MIDI_POP_MIX; midi_pop_v = (int16_t)value; midi_pop_seq++;
+    }
     switch (cc) {
     case 1:
         c->wheel = (uint8_t)value;

@@ -11,7 +11,8 @@ MiniLab preset (`MiniLab-3.md`), programmed on the keyboard itself. No computer 
   pick **KEYS**, press BACK.
 - **Preset mode:** press DAW/PRESET until it is dim.
 
-The keyboard's channel picks the FM-1 track: channels 1–4 play tracks 1–4. Set it in GLOBAL (SHIFT + MODE/GLOBAL).
+The keyboard's channel picks the FM-1 track: channels 1–4 play tracks 1–4, and **channel 16 plays whichever track is
+selected on the FM-1** (the WaveLoop build). Set it in GLOBAL (SHIFT + MODE/GLOBAL).
 
 ## Load the ready preset (easiest)
 
@@ -36,9 +37,10 @@ its settings, press the encoder to change one. Program everything below, then pr
 | Knob 4 | turn it | Channel Global, CC 10: pan |
 | Knob 5 | turn it | Channel Global, CC 73: attack |
 | Knob 6 | turn it | Channel Global, CC 75: decay |
-| Knob 7 | turn it | Channel Global, CC 72: release |
-| Knob 8 | turn it | Channel Global, CC 1: mod (vibrato) |
+| Knob 7 | turn it | Channel Global, CC 79: sustain (not on Prophet, FM6, CZ-1) |
+| Knob 8 | turn it | Channel Global, CC 72: release |
 | Faders 1–4 | move it | Channel 1, 2, 3, 4 (one each), CC 7: track levels |
+| Fader 9 | move it | Channel Global, CC 8: what you hear: down = the computer only, middle = both at full, up = the FM-1 only (USB connected) |
 | Encoder turn | SHIFT + turn the encoder | Channel Global, Message **CC RELTV**, CC 114, Type **Right 65, Left 63**: next / previous sound on the FM-1's selected track |
 | Encoder press | SHIFT + press the encoder | Channel Global, Assign CC, CC 115, Press 127, Release 0: next track |
 | Fader button 1 | press it | Channel Global, Mode CC, CC 112, Press 63, Release 64: previous engine |
@@ -47,11 +49,12 @@ its settings, press the encoder to change one. Program everything below, then pr
 | Mod wheel | move it | Channel Global, CC 1 |
 | Pitch wheel | move it | Channel Global |
 
-Faders 5–9 and the other buttons stay as they are; Melodee ignores what they send.
+Faders 5–8 and the other buttons stay as they are.
 
 ## What you see on the FM-1
 
-A knob turn shows a card with the track, the parameter and its value for under a second. The line under the BPM shows
+A knob turn shows a card with the track, the parameter and its value for under a second. Fader 9 shows MIX with
+how loud the computer and the FM-1 each are. The line under the BPM shows
 how far the sound is through its engine's sounds as the encoder walks them.
 
 ## Not yet tried
