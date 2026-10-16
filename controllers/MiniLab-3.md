@@ -33,6 +33,9 @@ change the track you are playing.
 
 Engines that do not list a knob ignore it.
 
+Tap HOME on the FM-1 for the controls page: every mapped knob, fader, the encoder, the engine buttons and the pads,
+with what each one does on the selected track and its value now (tap HOME again for Stage).
+
 Every knob turn shows a card on the FM-1 for under a second: the track, the parameter and its value, with a bar.
 The line under the BPM and engine name at the top of the screen shows how far the selected sound is through its
 engine's factory sounds.

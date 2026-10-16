@@ -250,8 +250,9 @@ static void midi_pop_note(const track_t *t, uint32_t id, int32_t v)
     midi_pop_v = (int16_t)v;
     midi_pop_seq++;
 }
-/* Native envelope loops run only for their CC, outside the audio IRQ's hot loops. */
-static __attribute__((noinline)) void midi_parameter(track_t *t,uint32_t cc,uint32_t value)
+/* what CC cc sets on track t: a parameter (P_*), MIDI_POP_NATIVE | cc for the engine's own envelope (72 73 75 on
+ * Prophet, FM6, CZ-1), or P_COUNT: nothing (midi_parameter; the controls page, ui_knobmap.c, names it) */
+static uint32_t midi_cc_id(const track_t *t, uint32_t cc)
 {
     uint32_t id=P_COUNT;
     switch(cc){case 5:id=P_GLIDE;break;case 7:id=P_LEVEL;break;case 10:id=P_PAN;break;
@@ -260,8 +261,17 @@ static __attribute__((noinline)) void midi_parameter(track_t *t,uint32_t cc,uint
         static const uint8_t map[NENGINES]={0,0,0x30,0x56,0,0x07,0,0,0,0,0x30,0x34,0x30,0,0,0,0,0,0,0x12};
         uint32_t macro=(map[t->eng_req%NENGINES]>>(cc==74?4:0))&15u;
         if(macro)id=P_E0+macro-1u;else if(cc==74 && t->eng_req==ENGI_CZ)id=P_ED_FLT;
-        break; }default:return;}
-    if((cc==72 || cc==73 || cc==75) && motion_native_tag(t)){   /* (the engine's own envelope: its motion too) */
+        break; }default:return P_COUNT;}
+    if((cc==72 || cc==73 || cc==75) && motion_native_tag(t))
+        return MIDI_POP_NATIVE|cc;
+    return id;
+}
+/* Native envelope loops run only for their CC, outside the audio IRQ's hot loops. */
+static __attribute__((noinline)) void midi_parameter(track_t *t,uint32_t cc,uint32_t value)
+{
+    uint32_t id=midi_cc_id(t,cc);
+    if(id==P_COUNT)return;
+    if(id&MIDI_POP_NATIVE){   /* (the engine's own envelope: its motion too) */
         uint8_t old[MO_NATIVE_N];uint32_t f=motion_guard();
         motion_native_peek(t,old);
         if(t->eng_req==ENGI_PROPHET){

@@ -2254,7 +2254,8 @@ static void ui_input(void)
         open_family(FAM_SEQ);
     }
     if (home == BT_TAP && ui.home && !pop.on) {         /* HOME acts on release (a hold opens the menu); on HOME: its */
-        ui.home_pg = (uint8_t)!ui.home_pg;              /* other page (ui_view.c) */
+        ui.home_pg = (uint8_t)(ui.home_pg ? 0u : 2u);   /* other page: WaveLoop fork, the controls page
+                                                         * (ui_knobmap.c); the chord view (ui_view.c, 1) is not shown */
         ui.force = 1;
     } else if (home == BT_TAP) {
         go_home();                                      /* (to the page it was on) */

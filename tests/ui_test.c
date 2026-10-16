@@ -1015,13 +1015,14 @@ static int test_home_view(void)
     ui_power_on();
     go_home(); frame();
     press(B_HOME);
-    bad += check("HOME on Stage: the second page (the chord view)", ui.home && ui.home_pg == 1u);
+    bad += check("HOME on Stage: the controls page (WaveLoop fork; the chord view is not shown)", ui.home && ui.home_pg == 2u);
     press(B_HOME);
     bad += check("  HOME again: Stage", ui.home && ui.home_pg == 0u);
     press(B_HOME);
     open_family(FAM_EDIT); frame();
     press(B_HOME);
-    bad += check("  HOME from EDIT: back to the page it was on", ui.home && ui.home_pg == 1u);
+    bad += check("  HOME from EDIT: back to the page it was on", ui.home && ui.home_pg == 2u);
+    ui.home_pg = 1; ui.force = 1;                    /* (the chord view: kept in the code, checked here) */
     song.ntrk = 3;
     for (k = 0; k < NTRK; k++) trk[k].engine = trk[k].eng_req;
     memset(&view, 0, sizeof view);
@@ -1658,11 +1659,11 @@ static int test_display_preferences(void)
         int steps_ok = settings.palette == 2;
         for (uint32_t k = 3; k < NPALETTES; k++) { turn(EN_K1, 1); steps_ok &= settings.palette == k; }
         bad += check("COLOR KNOB 1 steps on through SUNSET .. LO-FI, then wraps to NIGHT",
-                     steps_ok && (turn(EN_K1, 1), settings.palette == UI_DEFAULT_INDEX));
+                     steps_ok && (turn(EN_K1, 1), settings.palette == 0u));   /* (NIGHT: index 0) */
     }
     press(B_OCTDN);
     bad += check("OCT- leaves display preferences without changing musical state",
-                 !ui.menu && settings.palette == UI_DEFAULT_INDEX && !memcmp(sounds, trk, sizeof sounds));
+                 !ui.menu && settings.palette == 0u && !memcmp(sounds, trk, sizeof sounds));   /* (where the knob left it) */
     return bad;
 }
 
