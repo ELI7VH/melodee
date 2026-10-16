@@ -24,7 +24,7 @@ change the track you are playing.
 | Bottom knob 7 | CC72, keyboard channel | Release |
 | Bottom knob 8 | CC1, keyboard channel | Mod (vibrato), same as the mod strip |
 | Faders 1–4 | CC7, channels 1–4 | Track 1–4 level, whatever channel the keys are on |
-| Pads, both banks | Notes 36–51, channel 10 | The first DRUM track (GLO > SYSTEM > DRUM, channel 10 by default) |
+| Pads, both banks | Notes 36–51, channel 4 | Track 4 (put the drums there; a new song's track 4 is the 808 kit) |
 | Mod strip | CC1, keyboard channel | Mod (vibrato) |
 | Pitch strip | Pitch bend, keyboard channel | Pitch bend |
 | Main encoder, turn | CC114, relative | Next / previous sound on the track selected on the FM-1. Past an engine's last sound it goes on into the next engine's, as PRESETS does |
