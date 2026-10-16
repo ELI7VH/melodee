@@ -235,6 +235,12 @@ static void hold(uint32_t label)                  /* held 0.8 s, then let go */
     fm1_in.buttons &= ~(1u << panel.btn[label]);
     frame();
 }
+static uint32_t page_sheet(void);
+static void hold_sheet(void)                      /* the page's sheet: OCT+ held; on Stage OCT- held (WaveLoop fork:
+                                                   * OCT+ held there makes a song) */
+{
+    hold(ui.home && page_sheet() == 1u ? B_OCTDN : B_OCTUP);
+}
 static void press(uint32_t label);
 static void edit_redo(void)                       /* EDIT held + OCT+: redo a load */
 {
@@ -901,7 +907,7 @@ static int test_track_count(void)
     bad += check("  a track not in use plays nothing", trk_quiet(&trk[2]));
     bad += check("  MIDI channel 2 (ROUT CH1-4): ignored when track 2 is not in use", !midi_track(1) &&
                  midi_track(0) == &trk[0]);
-    hold(B_OCTUP);
+    hold_sheet();
     bad += check("Stage: OCT+ held: its sheet, Add track (T2) and Remove track (-) at its foot", pop.on == POP_SHEET &&
                  pop.rows == SHEET_STAGE && str_eq(pop.rows[pop.n - 2u].label, "Add track") &&
                  str_eq(pop.rows[pop.n - 1u].label, "Remove track"));
@@ -911,7 +917,7 @@ static int test_track_count(void)
     trk[1].p[P_LEVEL] = 5;                              /* (left over in the empty place: Add starts it again) */
     one_note(&trk[1], 7, 50);
     go_home(); frame();
-    hold(B_OCTUP);
+    hold_sheet();
     sheet_do("Add track");
     bad += check("Add track: T2 in use, selected, the browser open on it", trk_n() == 2u && song.sel == 1 && !ui.home &&
                  cur_page()->graph == GR_BROWSE && msg_is("TRACK 2 ADDED"));
@@ -920,7 +926,7 @@ static int test_track_count(void)
     press(B_OCTDN);
     bad += check("  OCT-: back to Stage, the sound kept", ui.home && trk[1].eng_req == TRK_DEF[1][0]);
     for (n = 0; n < 4u; n++) {
-        hold(B_OCTUP);
+        hold_sheet();
         sheet_do("Add track");
         if (msg_is("TRACKS FULL"))
             break;                                      /* (OCT- on Stage is the previous song: WaveLoop fork) */
@@ -948,18 +954,18 @@ static int test_track_count(void)
     project_save(0);                                    /* (the slot it came from stays its slot) */
     song.playing = 1;
     go_home(); frame();
-    hold(B_OCTUP);
+    hold_sheet();
     sheet_do("Remove track");
     bad += check("Remove track playing: refused (STOP FIRST)", trk_n() == NTRK && !ui.confirm && msg_is("STOP FIRST"));
     stop_transport();
-    hold(B_OCTUP);
+    hold_sheet();
     sheet_do("Remove track");
     confirm_text(a, b);
     bad += check("Remove track: its question (Remove track 2?)", ui.confirm == CF_DEL_TRACK && ui.confirm_trk == 1u &&
                  str_eq(a, "REMOVE TRACK 2?"));
     press(B_OCTDN);
     bad += check("  No: nothing removed", trk_n() == NTRK && !ui.confirm);
-    hold(B_OCTUP);
+    hold_sheet();
     sheet_do("Remove track");
     ui_confirm_accept();
     ok = trk_n() == 3u && song.sel == 1 && msg_is("TRACK 2 REMOVED") && proj_cur == 0u;
@@ -994,13 +1000,13 @@ static int test_track_count(void)
     bad += check("  the one saved with four: four", trk_n() == NTRK);
     track_select(0);
     go_home(); frame();
-    hold(B_OCTUP);
+    hold_sheet();
     sheet_do("Remove track");
     ui_confirm_accept();
     bad += check("removing T1: T2 becomes T1 (the song's clock)", trk_n() == 3u && song.sel == 0 &&
                  trk[0].p[P_LEVEL] == 50 && trk[0].step[1].note[0] == 61);
     track_select(2);
-    hold(B_OCTUP);
+    hold_sheet();
     sheet_do("Remove track");
     ui_confirm_accept();
     bad += check("removing the last: the one before selected", trk_n() == 2u && song.sel == 1);
@@ -2073,7 +2079,7 @@ static int test_step_sheets(void)
     bad += check("..Slide: on, the sheet closed", (t->step[4].flags & SF_SLIDE) && !pop.on);
     sheet_do("Delete note");
     bad += check("..Delete note: gone", !step_on(&t->step[4]));
-    hold(B_OCTUP);
+    hold_sheet();
     bad += check("NOTES: OCT+ held: the pattern's sheet", pop.on == POP_SHEET && pop.rows == SHEET_PATTERN);
     press(B_OCTDN);
     ui_power_on();
@@ -2138,7 +2144,7 @@ static int test_init_scales_patterns(void)
     sound_name(TSEL, nm);
     bad += check("INIT: the CZ-1's: INIT TONE", TSEL->eng_req == ENGI_CZ && !TSEL->preset && str_eq(nm, "INIT TONE"));
     set_engine_of(TSEL, ENGI_FM6);
-    hold(B_OCTUP);
+    hold_sheet();
     sheet_do("Init sound");
     press(B_OCTUP);
     bad += check("INIT: the sound's sheet: Init sound, asked, FM6's INIT VOICE", TSEL->preset == FM6_NFAC &&
@@ -2182,7 +2188,7 @@ static int test_init_scales_patterns(void)
     ok = ui.ptc_dst == first + 1u && t->pattern == 0u;
     turn(EN_K1, -1);
     bad += check("..any knob moves the place (no pattern switched)", ok && ui.ptc_dst == first && t->pattern == 0u);
-    hold(B_OCTUP);
+    hold_sheet();
     bad += check("..OCT+ held: no sheet while copying", pop.on != POP_SHEET);
     ok = 1;
     for (i = 0; i < NSTEP; i++)
@@ -2300,14 +2306,14 @@ static int test_popups(void)
     bad += check("POPUPS: OCT+ tapped on a sound page: the sound's sheet (Enter), no octave", pop.on == POP_SHEET && song.octave == o);
     press(B_OCTDN);
     bad += check("POPUPS: OCT- closes it, the page stays", !pop.on && !ui.home && song.octave == o);
-    hold(B_OCTUP);
+    hold_sheet();
     bad += check("POPUPS: OCT+ held: the sheet too, no octave", pop.on == POP_SHEET && song.octave == o);
     turn(EN_K2, 1); turn(EN_K2, 1);
     press(B_OCTUP);
     bad += check("POPUPS: KNOB 2 the row, OCT+ does it (Favourite) and closes", !pop.on && preset_favorite());
-    hold(B_OCTUP); press(B_OCTDN);
+    hold_sheet(); press(B_OCTDN);
     bad += check("POPUPS: OCT- closes the sheet", !pop.on && !ui.confirm);
-    hold(B_OCTUP); press(B_OCTUP);
+    hold_sheet(); press(B_OCTUP);
     bad += check("POPUPS: a destructive row (Init sound) asks first", !pop.on && ui.confirm == CF_INIT_SOUND);
     press(B_OCTDN);
     turn(EN_K2, 1);
@@ -2508,7 +2514,7 @@ static int test_popups(void)
         press(B_HOME);
     }
     go_page(GR_SONG); frame();
-    hold(B_OCTUP);
+    hold_sheet();
     bad += check("POPUPS: SONG, OCT+ held: the song's sheet (no play)", pop.on == POP_SHEET && !song.playing);
     press(B_OCTUP);
     bad += check("POPUPS: Insert section: a row", !pop.on && chain_config.count == 1u);
@@ -2644,12 +2650,12 @@ static int test_chain(void)
     bad += check("SONG KNOB 4 (repeats) cannot add or clear rows", chain_config.count == old_count);
     for (k = chain_config.count; k < CHAIN_ROWS; k++) { turn(EN_K1, 1); turn(EN_K3, 1); }
     bad += check("SONG append row stays bounded at 16", chain_config.count == CHAIN_ROWS && chain_valid(&chain_config));
-    go_title("SONG"); hold(B_OCTUP); sheet_do("Clear song");
+    go_title("SONG"); hold_sheet(); sheet_do("Clear song");
     bad += check("Clear song (the song's sheet) requires explicit confirmation", ui.confirm == CF_CLEAR_SONG &&
                  chain_config.count == CHAIN_ROWS);
     press(B_OCTDN);
     bad += check("cancel preserves the full song", chain_config.count == CHAIN_ROWS);
-    hold(B_OCTUP); sheet_do("Clear song"); press(B_OCTUP);
+    hold_sheet(); sheet_do("Clear song"); press(B_OCTUP);
     bad += check("confirmed CLEAR SONG keeps musical steps", !chain_config.count && !ui.song_row);
     return bad;
 }
@@ -4226,9 +4232,9 @@ static int test_bughunt_ui(void)
     chain_defaults(&chain_config);
     pattern_init();                      /* no song rows */
     go_title("SONG"); frame();
-    hold(B_OCTUP); sheet_do("Delete section");
+    hold_sheet(); sheet_do("Delete section");
     ok = !ui.confirm && msg_is("NOTHING TO DELETE");   /* (the header, or wrapped on the toast: never cut) */
-    hold(B_OCTUP); sheet_do("Clear song");
+    hold_sheet(); sheet_do("Clear song");
     ok &= !ui.confirm && msg_is("NOTHING TO CLEAR");
     track_defaults_steps(TSEL);
     chain_config.count = 1; chain_config.row[0].slot = 0; chain_config.row[0].repeat = 1;
@@ -4236,7 +4242,7 @@ static int test_bughunt_ui(void)
     sheet_do("Clear pattern");                          /* an empty track, the song with a row */
     ok &= !ui.confirm && msg_is("NOTHING TO CLEAR");
     go_title("SONG"); frame();
-    hold(B_OCTUP); sheet_do("Clear song");
+    hold_sheet(); sheet_do("Clear song");
     bad += check("the sheets' Delete section / Clear song / Clear pattern with nothing there: NOTHING TO ..; a song: its dialog",
                  ok && ui.confirm == CF_CLEAR_SONG);
     /* 7: REC works in the layers, as PLAY: it arms the track (PLAY starts); the layer stays, no page */
@@ -5365,6 +5371,20 @@ static int test_resume_sounds(void)
         press(B_OCTDN);
         bad += check("  OCT- back: the second with the tweak made before leaving it (ATK 99)", proj_cur != first && trk[0].p[P_ATK] == 99);
         bad += check("  the octave never moved", song.octave == 0);
+        trk[0].p[P_ATK] = 55;                           /* (a tweak: the copy has it, the original keeps it too) */
+        uint32_t orig = proj_cur;
+        hold(B_OCTUP);
+        bad += check("  OCT+ held on HOME: a copy, the third song, playing (NEW SONG 3/3)",
+                     song_count(&pos) == 3u && pos == 3u && proj_cur != orig && project_used(proj_cur) &&
+                     trk[0].p[P_ATK] == 55 && msg_is("NEW SONG 3/3") && !pop.on);
+        press(B_OCTDN);
+        bad += check("  OCT- back to the one copied: its tweak kept", proj_cur == orig && trk[0].p[P_ATK] == 55);
+        hold(B_OCTDN);
+        bad += check("  OCT- held on HOME: Stage's sheet, no song change", pop.on == POP_SHEET && proj_cur == orig);
+        press(B_OCTDN);
+        hold(B_OCTUP);
+        hold(B_OCTUP);
+        bad += check("  four songs at most (SONGS FULL)", song_count(&pos) == 4u && msg_is("SONGS FULL"));
     }
     favorites.factory[RS_ROW][0] = 0;
     memset(proj_slot, 0, sizeof proj_slot);

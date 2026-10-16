@@ -706,6 +706,10 @@ static void jam_take(void)
 static void project_autosave(void);
 static void resume_save(void);                          /* resume_sounds.c (WaveLoop fork) */
 static void song_step(int dir);
+static void song_dupe(void);
+static uint32_t octdn_t0;                               /* WaveLoop fork: OCT- on Stage, tapped (the previous song) or
+                                                         * held (Stage's sheet) */
+static uint8_t octdn_deferred;
 static void autosave_poll(uint32_t active)
 {
     static uint32_t t0, rx;
@@ -2034,13 +2038,26 @@ static void ui_input(void)
     if (octup == BT_HOLD) {
         oct_eat |= 2u;                                  /* (its release is no OCT+) */
         oct_deferred = 0;
-        if(bulk_context())ui.bulk_hold=1;else page_sheet_open();
+        if(bulk_context())ui.bulk_hold=1;else if(ui.home&&page_sheet()==1u)song_dupe();else page_sheet_open();
     } else if (octup == BT_TAP && oct_deferred) {
         song_step(1);                                   /* (OCT+ on Stage, its sheet when held: on release; WaveLoop fork:
                                                          * the next song, not the octave) */
     }
     if (octup != BT_NONE || !((fm1_in.buttons >> panel.btn[B_OCTUP]) & 1u))
         oct_deferred = 0;
+    {                                                   /* WaveLoop fork: OCT- on Stage: tap the previous song, hold
+                                                         * Stage's sheet (OCT+ held makes a song) */
+        uint32_t octdn = btn_hold(&octdn_t0, B_OCTDN, now, octdn_deferred);
+        if (octdn == BT_HOLD && octdn_deferred) {
+            oct_eat |= 1u;                              /* (its release is no OCT-) */
+            octdn_deferred = 0;
+            page_sheet_open();
+        } else if (octdn == BT_TAP && octdn_deferred) {
+            song_step(-1);
+        }
+        if (octdn != BT_NONE || !((fm1_in.buttons >> panel.btn[B_OCTDN]) & 1u))
+            octdn_deferred = 0;
+    }
     if(ui.bulk_hold && !(fm1_in.buttons&(1u<<panel.btn[B_OCTUP]))){
         if(bulk_context()){if(bulk.on&&!slot_kind())notes_bulk_sheet_open();else if(!bulk.on)page_sheet_open();}ui.bulk_hold=0;
     }
@@ -2331,8 +2348,13 @@ static void ui_input(void)
                 song.octave = 0;
                 ui.oct_t0 |= 2u;                        /* (OCT+ then neither a tap nor a sheet) */
                 oct_deferred = 0;
+                octdn_t0 |= 2u;                         /* (nor OCT-) */
+                octdn_deferred = 0;
             } else if (b == B_OCTUP && page_sheet() == 1u) {
                 oct_deferred = 1;                       /* Stage: OCT+ on release, held: the sound's sheet */
+            } else if (b == B_OCTDN && page_sheet() == 1u) {
+                octdn_deferred = 1;                     /* WaveLoop fork: Stage: the previous song on release, held:
+                                                         * the sheet */
             } else {                                    /* WaveLoop fork: HOME's OCT- / OCT+ step the songs */
                 song_step(b == B_OCTDN ? -1 : 1);
             }

@@ -127,3 +127,35 @@ static void song_step(int dir)
     ui_message(b);
     ui.force = 1;
 }
+/* hold OCT+ on HOME (ui_input.c): a new song, a copy of this one (tweaks, patterns, all of it) in the next free slot,
+ * the one playing kept first. No name: it is told apart by its number */
+static void song_dupe(void)
+{
+    uint32_t k, pos, n;
+    char b[16];
+    if (transport_busy()) {
+        ui_message("STOP TO CHANGE SONG");
+        return;
+    }
+    if (proj_cur < 4u)
+        project_autosave();
+    else
+        rs_claim();
+    k = project_free_slot();
+    if (k >= 4u || project_used(k) || project_old(k)) {
+        ui_message("SONGS FULL");
+        return;
+    }
+    proj_name[0] = 0;
+    if (project_save(k) != 0 || proj_cur != k)
+        return;                                         /* (it said why: project_save) */
+    song.g[G_SLOT] = (int16_t)(k + 1u);
+    rs_start_hash = 0;
+    rs_mark();
+    n = song_count(&pos);
+    str_cpy(b, "NEW SONG 1/1", sizeof b);
+    b[9] = (char)('0' + pos);
+    b[11] = (char)('0' + n);
+    ui_message(b);
+    ui.force = 1;
+}

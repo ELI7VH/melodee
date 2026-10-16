@@ -162,7 +162,7 @@
         <h3>Holds and locks</h3>
         <p>Hold <kbd>GLO</kbd> or <kbd>SCL</kbd> for a quick layer on the keys and knobs (hold time is set in the global settings menu as <strong>HOLD</strong>). Double-press the same button within about 300&nbsp;ms to lock the layer open with both hands free; press it again to close. Holding <kbd>FX</kbd> does not open a layer. Hold <kbd>EDIT</kbd> to undo, <kbd>SAVE</kbd> to write the project back to its slot, <kbd>HOME</kbd> for the menu, <kbd>SEQ</kbd> for the PATTERNS grid, <kbd>REC</kbd> to capture.</p>
         <h3>Sheets and undo</h3>
-        <p>Hold <kbd>OCT+</kbd> on pages that have a sheet (Stage, sound pages, NOTES, PATTERNS, SONG, and others) to open actions such as Init sound, Copy to…, or Sound designer.</p>
+        <p>Hold <kbd>OCT+</kbd> on pages that have a sheet (sound pages, NOTES, PATTERNS, SONG, and others) to open actions such as Init sound, Copy to…, or Sound designer. On Stage hold <kbd>OCT−</kbd> instead.</p>
         <p><strong>Undo / redo:</strong></p>
         <ul>
           <li>Hold <kbd>EDIT</kbd> to undo. On NOTES, that undoes the last step edit first. Otherwise a finished recording take is undone first (<strong>UNDO RECORDING</strong>), and if there is none, the last sound or pattern load (or Capture).</li>
@@ -189,7 +189,7 @@
             <tr><td><kbd>SAVE</kbd></td><td>Tap for PRESETS / USER / PROJECT. Hold to write the project back to its slot. Playing stops first.</td></tr>
             <tr><td><kbd>PLAY/STOP</kbd></td><td>Start and stop the tracks in use.</td></tr>
             <tr><td><kbd>REC</kbd></td><td>Arm or disarm the selected track. While playing, recording starts at the next pattern start and continues across loops until you disarm or stop. Hold to capture (or take a jam on SONG).</td></tr>
-            <tr><td><kbd>OCT−</kbd> <kbd>OCT+</kbd></td><td>On Stage: the previous / next saved song; the bottom line shows SONG 2/3 and its name. The song you leave is saved first, tweaks and all. Stop first. In menus and everywhere else: go back / enter or confirm.</td></tr>
+            <tr><td><kbd>OCT−</kbd> <kbd>OCT+</kbd></td><td>On Stage: the previous / next saved song; the bottom line shows SONG 2/3 and its name. The song you leave is saved first, tweaks and all. Stop first. Hold <kbd>OCT+</kbd> for a new song: a copy of this one in the next free slot (four at most). Hold <kbd>OCT−</kbd> for the Stage sheet. In menus and everywhere else: go back / enter or confirm.</td></tr>
           </tbody>
         </table>
         <p>Key and button lights share one grammar: <strong>dark</strong> nothing there, <strong>dim</strong> something there, <strong>bright</strong> happening now, <strong>slow pulse</strong> waiting (for example REC armed but stopped, or a pattern queued for the loop end). The menu’s <strong>LIGHTS</strong> sets how bright idle indicators are.</p>
@@ -215,7 +215,7 @@
             <tr><td>Drum</td><td>TUNE</td><td>TONE</td><td>DECY</td><td>SNAP</td></tr>
           </tbody>
         </table>
-        <p>On a Drum track, lanes light as they hit. Hold <kbd>OCT+</kbd> for the Stage sheet: Init sound, Save as user…, Favourite, Undo last load, Sound designer, <strong>Add track</strong> and <strong>Remove track</strong>.</p>
+        <p>On a Drum track, lanes light as they hit. Hold <kbd>OCT−</kbd> for the Stage sheet: Init sound, Save as user…, Favourite, Undo last load, Sound designer, <strong>Add track</strong> and <strong>Remove track</strong>.</p>
         <p>Tap <kbd>HOME</kbd> again for the chord view: the twelve notes in a circle of fifths, the song’s key marked, sounding notes lit in their track’s color and joined into the chord, each track’s level pulsing in a corner, the output waveform, and four octaves of keys. A Drum track pulses with its level and does not add pitches to the wheel. Let go and the last chord stays, faded. Lifting notes one at a time keeps that whole chord until the last note is up; playing a new note starts a new chord. The knobs and octave buttons work as they do on Stage. Tap <kbd>HOME</kbd> again to return.</p>
         <p><strong>HOME SELECT</strong> (hold <kbd>HOME</kbd>) chooses what <kbd>SELECT</kbd> turns on both Stage pages: <strong>BPM</strong> (default), <strong>MOD WHEEL</strong> (the selected track’s, also sent as MIDI CC1), <strong>LEVEL</strong>, <strong>SWING</strong>, <strong>TRANSPOSE</strong>, <strong>CHORD</strong> (OFF, DIA3, DIA7, MAJ, MIN, DOM7, MAJ7, MIN7, SUS4, POW), <strong>ARP RATE</strong>, <strong>PATTERN</strong> (that track’s next pattern), or <strong>OFF</strong>. The choice is remembered. <strong>GLO SELECT</strong> offers the same choices for <kbd>GLO</kbd>+<kbd>SELECT</kbd> on any page, also defaulting to BPM.</p>
       </section>
@@ -224,7 +224,7 @@
         <h2>Tracks</h2>
         <p>One to four tracks, one instrument and sound each. A new song starts with one. <kbd>ALGORITHM</kbd> selects among the tracks in use; the screen and its knobs take that track’s color. In <strong>NIGHT</strong> the four tracks are coral, amber, mint and lilac. Other themes use their own four. Knob 1 is the track color; the other three knobs are shades of it.</p>
         <ul>
-          <li>On Stage, hold <kbd>OCT+</kbd> and choose <strong>Add track</strong>. The next track (up to four) starts with its own power-on sound and empty patterns, becomes selected, and opens the sound browser. <kbd>OCT−</kbd> keeps that starting sound. <strong>TRACKS FULL</strong> means four are already in use.</li>
+          <li>On Stage, hold <kbd>OCT−</kbd> and choose <strong>Add track</strong>. The next track (up to four) starts with its own power-on sound and empty patterns, becomes selected, and opens the sound browser. <kbd>OCT−</kbd> keeps that starting sound. <strong>TRACKS FULL</strong> means four are already in use.</li>
           <li><strong>Remove track</strong> removes the selected track after a question, and only while stopped (<strong>STOP FIRST</strong> otherwise). The tracks after it move down, taking their sounds, patterns, song sections, motion and recordings with them. The last remaining track cannot be removed.</li>
           <li>Stage, the mixer, PATTERNS, SONG and GLO show the tracks in use. Projects and the template keep their own track count. A project saved before this version keeps all four.</li>
           <li>Each track carries its own engine, sound, patterns, scale ROOT and transpose, effect sends, modulation and voice settings.</li>
@@ -253,7 +253,7 @@
         <ul>
           <li>Knobs accelerate on a spin; MENU → <strong>KNOB ACCEL</strong> OFF keeps every detent one step.</li>
           <li>Hold <kbd>EDIT</kbd> to return to the sound you had before browsing. Loading a sound never changes your patterns.</li>
-          <li>Hold <kbd>OCT+</kbd> on a sound page for the sheet: Init sound, Save as user…, Favourite, Undo last load, Sound designer. On Stage that sheet also has <strong>Add track</strong> and <strong>Remove track</strong>.</li>
+          <li>Hold <kbd>OCT+</kbd> on a sound page for the sheet: Init sound, Save as user…, Favourite, Undo last load, Sound designer. On Stage hold <kbd>OCT−</kbd> for it; that sheet also has <strong>Add track</strong> and <strong>Remove track</strong>.</li>
         </ul>
 
         <section id="saving">

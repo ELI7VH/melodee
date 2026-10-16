@@ -523,7 +523,7 @@ Thanks to [@aroum](https://github.com/aroum) for the detailed feedback in
   covers the step edits first
   When editing synth steps, SCL and EDIT use the editing controls below instead.
 - **FX** opens the track's three insert pages; SELECT moves between the slots.
-- **Tracks:** a new song has four tracks (WaveLoop fork; Melodee starts with one). On Stage, hold OCT+ for the sheet: **Add track** adds the next one (up to
+- **Tracks:** a new song has four tracks (WaveLoop fork; Melodee starts with one). On Stage, hold OCT− for the sheet (the WaveLoop build; OCT+ held makes a song): **Add track** adds the next one (up to
   four) with its own starting sound and empty patterns, selects it and opens the sound browser on it (OCT− keeps
   the starting sound). **Remove track** removes the selected track after a question, stopped only: the tracks after
   it move down a place with their sounds, patterns, song sections, motion and recordings. Stage, MIXER, PATTERNS,
@@ -536,7 +536,8 @@ Thanks to [@aroum](https://github.com/aroum) for the detailed feedback in
   key or MIDI note starts playback and records from step zero, skipping count-in.
   **REC + PLAY** arms and starts in one gesture, keeping recording active across loops
 - On Stage, OCT− / OCT+ step to the previous / next saved song (the WaveLoop build; the bottom line shows SONG 2/3
-  and its name). The song you leave is saved first, tweaks and all. Stop first. Both together: octave reset. Everywhere else OCT+ enters, opens or
+  and its name). The song you leave is saved first, tweaks and all. Stop first. Hold OCT+ for a new song: a copy of
+  this one in the next free slot (four at most). Hold OCT− for Stage's sheet. Both together: octave reset. Everywhere else OCT+ enters, opens or
   confirms and OCT− goes back. During synth step editing they move the step cursor
 - Save a sound: stop, tap SAVE, choose USER and a slot, press OCT+ to open its sheet with
   **Save here** selected, then OCT+ again (name it with the keys)
