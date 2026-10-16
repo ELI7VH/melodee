@@ -15,7 +15,7 @@
 #define UA_OFF_IN 2u
 #define UA_NO_IF 0xFFu
 static uint8_t ua_off;                          /* what the host is given (ua_cfg_build at usb_start) */
-static uint8_t ua_tracks, ua_tracks_want;       /* 0 stereo master (default), 1 four mono stems */
+static uint8_t ua_tracks = 1, ua_tracks_want = 1;   /* 0 stereo master, 1 four mono stems (WaveLoop fork: the default) */
 static uint8_t ua_off_want;                     /* GLO > SYSTEM (ua_off_set); ua_off_apply makes it ua_off */
 static uint32_t ua_off_ms;                      /* its last change */
 static uint8_t ua_if_play = UA_IF_PLAY, ua_if_cap = UA_IF_CAP, ua_nif = 5;   /* as sent (ua_cfg_build) */

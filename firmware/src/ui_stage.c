@@ -265,6 +265,11 @@ static void stage_panel_hits(void)                      /* every frame: the DRUM
 /* the band: the selected track's waveform, faint, the chord and notes in front (a DRUM track: its lanes) */
 static void stage_band(void)
 {
+#if WAVELOOP_STAGE_BAND_EMPTY                           /* WaveLoop fork: the band kept clear (no notes, chord or wave) */
+    cv_begin(240, ST_BAND_H, T_BG);
+    cv_blit(0, ST_BAND_Y);
+    return;
+#endif
     uint32_t sel = song.sel % NTRK, drum = (uint32_t)drum_track(TSEL), i;
     int held = 0;
     cv_begin(240, ST_BAND_H, T_BG);
@@ -628,16 +633,44 @@ static void stage_knobs(void)
 
 /* every frame the knobs; every other frame (the scope's) the rows (or, the knobs out, their picture), then the band
  * last */
+/* WaveLoop fork: a level meter in each row, in the gap between its numeral and its name: the track's output (its peak
+ * since the last frame, 60 dB over the meter, falling ~2 dB a frame as MIXER's), drawn every frame over the row; not
+ * while the knobs are out (they cover the rows) */
+static uint8_t st_lvl[NTRK];
+static void stage_meters(void)
+{
+    uint32_t k;
+    for (k = 0; k < trk_n(); k++) {
+        track_t *t = &trk[k];
+        int32_t m = t->p[P_MUTE] ? 0 : meter_px(t->peak), h = st_row_h(), cs = h >= 80 ? 34 : 26, hm = h - 12, f;
+        uint16_t tc = t->p[P_MUTE] ? T_DIM : T_TRK(k), bg = ux_mix(T_BG, tc, k == song.sel ? 24 : 11);
+        if (!ui.force) {                                /* (a full redraw draws the meters as they are) */
+            t->peak = 0;
+            if (m < st_lvl[k] - 1)
+                m = st_lvl[k] - 1;
+            st_lvl[k] = (uint8_t)(m < 0 ? 0 : m);
+        }
+        if (stage.out || hm < 8)
+            continue;
+        f = st_lvl[k] * hm / (TS_MH - 2);
+        cv_begin(4, (uint32_t)hm, bg);
+        cv_rect(0, 0, 4, hm, ux_mix(bg, tc, 30));
+        if (f > 0)
+            cv_rect(0, hm - f, 4, f, tc);
+        cv_blit((uint32_t)(BOX_X + 6 + cs + 3), (uint32_t)(st_row_y(k) + 6));
+    }
+}
 static void stage_draw(void)
 {
     uint32_t k;
     stage_panel_hits();
     stage_knobs();
-    if (!ui.force && (ui.frame & 1u))
-        return;
-    if (stage.out && !ui.home_pg)
-        stage_shape();
-    for (k = 0; k < trk_n(); k++)
-        stage_row(k);
-    stage_band();
+    if (ui.force || !(ui.frame & 1u)) {
+        if (stage.out && !ui.home_pg)
+            stage_shape();
+        for (k = 0; k < trk_n(); k++)
+            stage_row(k);
+        stage_band();
+    }
+    stage_meters();                                     /* (over the rows, every frame) */
 }

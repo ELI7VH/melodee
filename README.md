@@ -159,8 +159,8 @@ standard and single-core firmware; the current installer offers dual-core firmwa
   SEQ > TEMPO > QNT quantizes the new take when recording ends; OFF keeps played timing.
 - **Note editing:** bulk deletion includes recorded notes, and pattern clearing removes
   manual notes, recorded notes and motion together.
-- **USB capture:** stereo master capture is the default, including track and shared
-  effects. Hold HOME and choose USB INPUT > 4 TRACKS for isolated mono stems.
+- **USB capture:** four isolated mono stems, one per track, are the default (WaveLoop fork). Hold HOME and
+  choose USB INPUT > STEREO for the stereo master, including track and shared effects.
 - **Optional autosave:** hold HOME and set AUTOSAVE to OFF to keep project saves manual.
   It defaults ON, remembers the choice across power-offs, and leaves manual SAVE working.
 - **Clock choice:** the HOME menu's OVERCLOCK chooses 320 MHz (default) or 360 MHz for

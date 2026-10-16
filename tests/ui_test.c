@@ -2879,11 +2879,13 @@ static int test_layer(void)
         bad += check("USB INPUT menu and persisted four-track mode",
                      ok && p.favorites.factory[15][26] == 0xA1u && settings_import(&p, sizeof p) && ua_tracks && ua_tracks_want);
         p.favorites.factory[15][26] = 1;
-        bad += check("old/unknown USB INPUT setting defaults to stereo",
-                     settings_import(&p, sizeof p) && !ua_tracks && !ua_tracks_want);
+        bad += check("old/unknown USB INPUT setting defaults to four tracks (WaveLoop fork)",
+                     settings_import(&p, sizeof p) && ua_tracks && ua_tracks_want);
+        ua_tracks = ua_tracks_want = 0;
         settings_export(&p);
-        bad += check("stereo setting saves without changing PER5 layout",
-                     sizeof p == 604 && !p.favorites.factory[15][26]);
+        bad += check("stereo setting saves (tagged 0xA2) without changing PER5 layout",
+                     sizeof p == 604 && p.favorites.factory[15][26] == 0xA2u && settings_import(&p, sizeof p) &&
+                     !ua_tracks && !ua_tracks_want);
         p.favorites.factory[15][26] = 0xA1u;
         usb.up = 1; ua_cap_channels = 2;
         bad += check("live restored USB mode waits for re-enumeration",

@@ -26,11 +26,14 @@ static int defaults(void)
         settings_lights == LIGHTS_MID && tuning_a4 == A4_DEFAULT &&
         settings_autosave && !settings_screen && !settings_click && settings_click_level == 1u &&
         !settings_countin && !settings_preview && !settings_chord_add &&
-        !ua_off && !ua_off_want && !ua_tracks && !ua_tracks_want &&
+        !ua_off && !ua_off_want && ua_tracks && ua_tracks_want &&   /* (WaveLoop fork: four mono stems by default) */
         !memcmp(&panel, &PANEL_DEFAULT, sizeof panel) && !template_used() && !template_old();
     for (uint32_t k = 0; k < 4u; k++) ok &= settings_glo[k] == GP[GLO_KEPT[k]].def;
     for (uint32_t i = 0; i < sizeof favorites; i++)
-        if (i < 60u || i >= 64u) ok &= !((const uint8_t *)&favorites)[i]; /* owner tag isn't a preference */
+        if ((i < 60u || i >= 64u) &&                   /* owner tag isn't a preference; the USB INPUT tag (four tracks:
+                                                         * 0xA1, the WaveLoop fork's default) neither */
+            &((const uint8_t *)&favorites)[i] != &favorites.factory[15][26])
+            ok &= !((const uint8_t *)&favorites)[i];
     return ok && !favorites_user_hi;
 }
 static void stale_ram(void)
@@ -64,7 +67,7 @@ static int test_foreign(void)
     uint32_t crc = music_crc(), before = erases;
     stale_ram(); boot_trace = 1;
     persist_boot();
-    bad += check("foreign PER5 extension resets settings and enables stereo USB", defaults() && settings_owned(&persist_saved));
+    bad += check("foreign PER5 extension resets settings and the four-track USB default", defaults() && settings_owned(&persist_saved));
     bad += check("cleanup flushes warning and writes only one settings sector", erases == before + 1 && !boot_trace_bad && !boot_work.state && boot_work.done == 1 && !strcmp(boot_work.title, "RESETTING SETTINGS") && music_crc() == crc);
     before = erases; uint32_t flushed = boot_syncs;
     persist_boot();

@@ -41,6 +41,9 @@
 #ifndef P5_OVERSAMPLE
 #define P5_OVERSAMPLE 1 /* prototype: benchmark base rate before enabling optional 2x */
 #endif
+#ifndef WAVELOOP_STAGE_BAND_EMPTY
+#define WAVELOOP_STAGE_BAND_EMPTY 1 /* WaveLoop fork: Stage's band (notes, chord, wave) kept clear */
+#endif
 #ifndef MELODEE_LEGACY_EXTRAS
 #define MELODEE_LEGACY_EXTRAS 0 /* reference tests only: retired TRIO, WHEEL and PHYS; PHASE, VOICE and NOISE (retired
                                  * 2026-10-10: the flash for the redesign; CZ-1 keeps PHASE's phase-distortion core) */

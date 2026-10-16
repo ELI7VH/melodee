@@ -927,7 +927,8 @@ static void setup(int s)
         if (s == S_MAP_DRUM_CATEGORY) smap_input(0, 1, 0);
         break;
     case S_HOME: song.octave = 2; song.rec = 1; usb.config = 1; break;
-    case S_HOME_IDLE: song.playing = 0; song.batt_raw = 570; ui.hot_col = 1; ui.hot_t = 30; break;
+    case S_HOME_IDLE: song.playing = 0; song.batt_raw = 570; ui.hot_col = 1; ui.hot_t = 30;
+        trk[0].peak = 20000; trk[1].peak = 3000; trk[2].peak = 400; trk[3].peak = 9000; st_lvl[0] = st_lvl[1] = st_lvl[2] = st_lvl[3] = 0; break;   /* (Stage's meters) */
     case S_HOME_NOTE: input_on(TSEL, 61, 100); break;
     case S_HOME_FM6: eng(ENGI_FM6); /* fall through */
     case S_HOME_CHORD:

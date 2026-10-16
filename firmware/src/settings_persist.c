@@ -72,7 +72,8 @@ static int settings_import(persist_t *p, int n)
     }
     memcpy(settings_glo, p->ext.glo, sizeof settings_glo);
 #if MELODEE_USB_AUDIO
-    uint8_t tracks = p->favorites.factory[15][26] == 0xA1u;
+    uint8_t tracks = p->favorites.factory[15][26] != 0xA2u;   /* WaveLoop fork: four mono stems unless STEREO was
+                                                              * chosen here (0xA2) */
     if (usb.up) ua_tracks_set(tracks, fm1_ms);    /* live backup restore: re-enumerate before changing stride */
     else ua_tracks = ua_tracks_want = tracks;
     ua_off = ua_off_want = (uint8_t)p->ext.usb_off;    /* (usb_start, after this, builds the configuration) */
@@ -120,7 +121,8 @@ static void settings_export(persist_t *p)
     memcpy(p->favorites.factory[1] + 28, SETTINGS_OWNER, sizeof SETTINGS_OWNER);
 #if MELODEE_USB_AUDIO
     p->ext.usb_off = ua_off;
-    p->favorites.factory[15][26] = ua_tracks ? 0xA1u : 0u; /* tagged; old/unknown bytes default to stereo */
+    p->favorites.factory[15][26] = ua_tracks ? 0xA1u : 0xA2u; /* tagged; WaveLoop fork: old/unknown bytes default to
+                                                              * four tracks, 0xA2 is STEREO chosen */
 #endif
     p->favorites.factory[15][27]=settings_screen;
     p->favorites.factory[15][28] = settings_autosave ? 0u : AUTOSAVE_OFF_TAG;
