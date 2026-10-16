@@ -6,7 +6,8 @@
  *    how it started, and from then on saves itself like any other. With no free slot it waits for a SAVE.
  *  - The slot last used is kept in the settings record (the favourites row of retired engine 5, VOICE: its presets
  *    are never shown, so its bits are never set) and loads at power-on, unless a BOOT project is set (it wins).
- * Flash is written only while stopped and, as every settings write, not while USB audio streams (project.c). */
+ * Flash is written only while stopped and quiet; the slot marker goes through while USB audio streams (persist_quiet),
+ * as the song's own save does, so a FM-1 on a computer resumes too. */
 #define RS_ROW 5u
 #define RS_TAG 0x57u                                     /* 'W' */
 #define RS_VER 2u
@@ -34,6 +35,9 @@ static void resume_save(void)
     if (proj_cur < 4u && (b[0] != RS_TAG || b[1] != RS_VER || b[2] != proj_cur + 1u)) {
         memset(b, 0, 32);
         b[0] = RS_TAG; b[1] = RS_VER; b[2] = (uint8_t)(proj_cur + 1u);
+#if MELODEE_FLASH
+        persist_quiet = 1;
+#endif
         settings_save();
     }
 }

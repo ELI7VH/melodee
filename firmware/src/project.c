@@ -1126,6 +1126,8 @@ static void project_boot(void)
 #if MELODEE_FLASH
 static persist_t persist_saved;
 static uint8_t persist_pending;                 /* 1 requested, 2 waiting after a flash error */
+static uint8_t persist_quiet;                   /* WaveLoop: a save asked for while the FM-1 is quiet (resume_sounds.c): USB audio
+                                                * streaming does not hold it, as it does not hold a project autosave */
 static uint8_t persist_repair;                  /* boot repair must retry even when RAM equals defaults */
 static uint32_t persist_retry_ms;
 #endif
@@ -1254,7 +1256,7 @@ static void settings_poll(void)
     /* Live preference edits queue their flash save until audio is idle. */
     for(uint32_t k=0;k<NPART;k++)for(uint32_t i=0;i<NVOICE;i++)if(trk[k].v[i].active)return;
 #if MELODEE_USB_AUDIO
-    if(ua.play_alt || ua.cap_alt)return;
+    if(!persist_quiet && (ua.play_alt || ua.cap_alt))return;
 #endif
 #endif
     if (template_old()) {
@@ -1267,7 +1269,7 @@ static void settings_poll(void)
     p = persist_saved;
     settings_export(&p);
     if (!persist_repair && !memcmp(&p, &persist_saved, sizeof p) && !tmpl_dirty) {
-        persist_pending = 0;
+        persist_pending = persist_quiet = 0;
         return;                                    /* unchanged: no erase cycle */
     }
     set_rec.p = p;                                 /* the record: the settings, the template (tmpl) after them */
@@ -1277,6 +1279,7 @@ static void settings_poll(void)
         persist_saved = p;
         persist_pending = 0;
         persist_repair = 0;
+        persist_quiet = 0;
         tmpl_dirty = 0;
         if (repairing) { BOOT_WORK_PROGRESS(1); BOOT_WORK_END(0); }
     } else {
