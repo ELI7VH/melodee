@@ -10,7 +10,7 @@ typedef struct {
 } km_cell_t;
 static const km_cell_t KM_CELLS[16] = {
     {KM_CC, 74, "K1"}, {KM_CC, 71, "K2"}, {KM_CC, 5, "K3"}, {KM_CC, 10, "K4"},
-    {KM_CC, 73, "K5"}, {KM_CC, 75, "K6"}, {KM_CC, 72, "K7"}, {KM_CC, 1, "K8"},
+    {KM_CC, 73, "K5"}, {KM_CC, 75, "K6"}, {KM_CC, 79, "K7"}, {KM_CC, 72, "K8"},
     {KM_LEVEL, 0, "F1"}, {KM_LEVEL, 1, "F2"}, {KM_LEVEL, 2, "F3"}, {KM_LEVEL, 3, "F4"},
     {KM_SOUND, 0, "ENC"}, {KM_ENGINE, 0, "BNK"}, {KM_PRESS, 0, "NEXT"}, {KM_PADS, 3, "PAD"},
 };

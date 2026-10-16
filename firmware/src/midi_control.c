@@ -257,6 +257,8 @@ static uint32_t midi_cc_id(const track_t *t, uint32_t cc)
     uint32_t id=P_COUNT;
     switch(cc){case 5:id=P_GLIDE;break;case 7:id=P_LEVEL;break;case 10:id=P_PAN;break;
     case 72:id=P_REL;break;case 73:id=P_ATK;break;case 75:id=P_DEC;break;
+    case 79:return motion_native_tag(t)?P_COUNT:P_SUS;   /* WaveLoop fork: sustain (the engines with their own envelope:
+                                                         * none) */
     case 74:case 71:{
         static const uint8_t map[NENGINES]={0,0,0x30,0x56,0,0x07,0,0,0,0,0x30,0x34,0x30,0,0,0,0,0,0,0x12};
         uint32_t macro=(map[t->eng_req%NENGINES]>>(cc==74?4:0))&15u;

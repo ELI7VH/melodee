@@ -21,8 +21,8 @@ change the track you are playing.
 | Top knob 4 | CC10, keyboard channel | Pan |
 | Bottom knob 5 | CC73, keyboard channel | Attack |
 | Bottom knob 6 | CC75, keyboard channel | Decay |
-| Bottom knob 7 | CC72, keyboard channel | Release |
-| Bottom knob 8 | CC1, keyboard channel | Mod (vibrato), same as the mod strip |
+| Bottom knob 7 | CC79, keyboard channel | Sustain (not on Prophet, FM6, CZ-1: their own envelopes) |
+| Bottom knob 8 | CC72, keyboard channel | Release |
 | Faders 1–4 | CC7, channels 1–4 | Track 1–4 level, whatever channel the keys are on |
 | Pads, both banks | Notes 36–51, channel 4 | Track 4 (put the drums there; a new song's track 4 is the 808 kit) |
 | Mod strip | CC1, keyboard channel | Mod (vibrato) |
