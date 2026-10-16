@@ -5348,6 +5348,22 @@ static int test_resume_sounds(void)
     memset(proj_bank_slot, 0, sizeof proj_bank_slot);
     return bad;
 }
+/* WaveLoop fork: MIDI channel 16 follows the FM-1's selected track */
+static int test_ch16_follows(void)
+{
+    int bad = 0;
+    uint8_t dch = settings_drumch;
+    ui_power_on();
+    song.ntrk = 4; song.g[G_ROUTE] = 0; settings_drumch = 10;
+    track_select(2);
+    bad += check("channel 16: the selected track (T3), ROUT CH1-4", midi_track(15) == &trk[2]);
+    track_select(0);
+    bad += check("  selection moves, channel 16 follows (T1); channel 2 stays T2", midi_track(15) == &trk[0] && midi_track(1) == &trk[1]);
+    settings_drumch = 16;
+    bad += check("  drum channel set to 16: the drums keep it", midi_track(15) != &trk[0] || drum_track(&trk[0]));
+    settings_drumch = dch;
+    return bad;
+}
 /* WaveLoop fork: a MIDI knob's card shows, then goes after CC_CARD_MS and leaves the page as a clean redraw has it */
 static int test_knob_card(void)
 {
@@ -5379,6 +5395,7 @@ int main(void)
     bad += test_home_notes();
     bad += test_knob_card();
     bad += test_resume_sounds();
+    bad += test_ch16_follows();
     bad += test_stage();
     bad += test_capture();
     bad += test_undo_levels();

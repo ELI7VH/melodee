@@ -10,7 +10,8 @@ Play Melodee on the FM-1 from an Arturia MiniLab 3, over USB or the TRS MIDI cab
 
 ## What the controls do
 
-The keyboard's MIDI channel picks the track: channels 1–4 play tracks 1–4. The knobs follow that channel, so they
+The keyboard's MIDI channel picks the track: channels 1–4 play tracks 1–4, and **channel 16 plays whichever track
+is selected on the FM-1** (the WaveLoop build), so you never have to switch channels while playing. The knobs follow that channel, so they
 change the track you are playing.
 
 | MiniLab | MIDI | Melodee |

@@ -1112,8 +1112,9 @@ static track_t *midi_track(uint32_t ch)
 {
     uint32_t k, route = (uint32_t)song.g[G_ROUTE];
     uint32_t first = route > 1u ? (route - 1u) * 4u : 0u;
-    if (route != 1u && (ch < first || ch - first >= 4u))
-        return 0;
+    if (route != 1u && (ch < first || ch - first >= 4u))   /* WaveLoop fork: channel 16, when ROUT and the drum channel
+                                                         * leave it free, plays and edits the track selected on the FM-1 */
+        return ch == 15u && settings_drumch != 16u ? TSEL : 0;
     if (settings_drumch && ch + 1u == settings_drumch) {
         for (k = 0; k < trk_n(); k++)
             if (drum_track(&trk[k]))
