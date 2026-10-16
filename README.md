@@ -523,7 +523,7 @@ Thanks to [@aroum](https://github.com/aroum) for the detailed feedback in
   covers the step edits first
   When editing synth steps, SCL and EDIT use the editing controls below instead.
 - **FX** opens the track's three insert pages; SELECT moves between the slots.
-- **Tracks:** a new song has one track. On Stage, hold OCT+ for the sheet: **Add track** adds the next one (up to
+- **Tracks:** a new song has four tracks (WaveLoop fork; Melodee starts with one). On Stage, hold OCT+ for the sheet: **Add track** adds the next one (up to
   four) with its own starting sound and empty patterns, selects it and opens the sound browser on it (OCT− keeps
   the starting sound). **Remove track** removes the selected track after a question, stopped only: the tracks after
   it move down a place with their sounds, patterns, song sections, motion and recordings. Stage, MIXER, PATTERNS,
@@ -739,8 +739,8 @@ selects the grid committed at recording end. The DRUM grid keeps its white-key s
 
 On **SAVE > PROJECT**, KNOB 2 **BOOT** selects OFF or project A–D to load at power-on.
 KNOB 1 **SLOT** also offers **TMPL**: save your sounds and settings there as the template for new
-projects, with empty patterns and its number of tracks. BOOT OFF uses the template when one is saved, else one track
-with the power-on sound. CLK, TUNE, MIDI
+projects, with empty patterns and its number of tracks. BOOT OFF uses the template when one is saved, else four tracks
+with the power-on sounds. CLK, TUNE, MIDI
 and ROUT persist between starts; loading a project or template applies its own settings. DRUM is the
 device's own setting.
 

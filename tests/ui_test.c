@@ -882,7 +882,8 @@ static int test_track_count(void)
     memset(proj_bank_slot, 0, sizeof proj_bank_slot);
     project_new_blank();
     go_home(); frame();
-    bad += check("a new song: one track, T1 selected", trk_n() == 1u && song.sel == 0);
+    bad += check("a new song: four tracks (WaveLoop fork), T1 selected", trk_n() == NTRK && song.sel == 0);
+    song.ntrk = 1;                                      /* (the one-track checks below: as a song cut down to one) */
     bad += check("  no pattern at all: Stage's card shows no pattern pill, no steps (a synth)", stage_seq_idle(0));
     one_note(&trk[0], 3, 60);
     ok = !stage_seq_idle(0);
@@ -982,7 +983,7 @@ static int test_track_count(void)
     bad += check("  and silent", trk_quiet(&trk[3]));
     project_save(1);
     project_new_blank();
-    bad += check("a new song: one track again", trk_n() == 1u);
+    bad += check("a new song: four tracks again", trk_n() == NTRK);
     project_load(1);
     bad += check("a project keeps its count (3)", trk_n() == 3u && trk[2].step[3].note[0] == 63);
     project_load(0);
@@ -1915,7 +1916,7 @@ static int test_roll(void)
     ui.force = 1; ui_draw();
     n = roll_diff(BPM_X, 0, BPM_X + BPM_W, H_HEAD, 1);
     ok &= n > 20u && roll_diff(BPM_X, 0, BPM_X + BPM_W, H_HEAD, 0) == roll_diff(STRIP(0), 1);   /* (+ the card's strip) */
-    ok &= roll_diff(BPM_X, 0, BPM_X + text_w(TY_TX, "12"), H_HEAD, 1) == 0;
+    ok &= roll_diff(BPM_X, 0, BPM_X + text_w(TY_LB, "12"), H_HEAD, 1) == 0;   /* (the header BPM: the label face) */
     ok &= roll_diff(ring_vx(0), VY, ring_vx(0) + text_w(TY_TX, "12"), VY + ROLL_H, 1) == 0;
     /* TUNE 10 -> 11 on a card: the 1 stays */
     ui_power_on(); song.g[G_TUNE] = 10; roll_settle();
