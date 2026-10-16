@@ -13,7 +13,16 @@ MiniLab preset (`MiniLab-3.md`), programmed on the keyboard itself. No computer 
 
 The keyboard's channel picks the FM-1 track: channels 1–4 play tracks 1–4. Set it in GLOBAL (SHIFT + MODE/GLOBAL).
 
-## Program it
+## Load the ready preset (easiest)
+
+1. Plug the Oxygen into the computer by USB and open M-Audio's Oxygen Pro 61 Preset Editor.
+2. File > Load Preset > `Melodee.OxygenPro61UserPreset` (in this folder).
+3. File > Send Preset, pick a preset slot, Send.
+4. On the keyboard: hold PRESET, pick MELODEE with the encoder, press it.
+
+The file was made in the Preset Editor (bank 1) and differs from its default preset only in the settings below.
+
+## Or program it on the keyboard
 
 Hold SHIFT and press PRESET to edit the current preset. Touch a control to pick it, turn the encoder to move between
 its settings, press the encoder to change one. Program everything below, then press PRESET and choose **Save As**
@@ -47,5 +56,5 @@ how far the sound is through its engine's sounds as the encoder walks them.
 
 ## Not yet tried
 
-Written from M-Audio's Oxygen Pro Series User Guide v1.1 (Preset Edit Mode, pages 65–84) and the firmware's MIDI code.
-It has not been programmed into an Oxygen Pro 61 and played.
+The preset file was built in the Preset Editor; the steps follow M-Audio's Oxygen Pro Series User Guide v1.1 (Preset
+Edit Mode, pages 65–84). Neither has been sent to an Oxygen Pro 61 and played yet.
