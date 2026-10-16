@@ -1145,7 +1145,7 @@ static void draw_toast(void)
 }
 /* the knob card: what a MIDI controller just changed (midi_control.c midi_pop_note), its track, name, value and a
  * bar, over the middle of the page for CC_CARD_MS after the last change; the page comes back whole after */
-#define CC_CARD_MS 1200u
+#define CC_CARD_MS 800u
 #define CC_CARD_H 76
 #define CC_CARD_Y 88
 static struct { uint8_t seq, on, trk; uint16_t id; int16_t v; uint32_t t; } ccc;
@@ -1160,11 +1160,8 @@ static void draw_cc_card(void)
     }
     if (!ccc.on)
         return;
-    if (fm1_ms - ccc.t >= CC_CARD_MS) {
-        ccc.on = 0;
-        ui.force = 1;
-        return;
-    }
+    if (fm1_ms - ccc.t >= CC_CARD_MS)
+        return;                                         /* (gone: ui_draw_frame gives its place back) */
     lab[0] = 'T'; lab[1] = (char)('1' + ccc.trk % NTRK); lab[2] = ' '; lab[3] = 0;
     if (ccc.id & MIDI_POP_NATIVE) {                     /* an engine's own envelope: 0..127 as % */
         uint32_t cc = ccc.id & 127u;
@@ -1225,6 +1222,12 @@ static void ui_draw_frame(void)
      * requested by draw_toast after the page was drawn is cleared this frame. */
     if (toast_shown && !head_toast(BPM_X + BPM_W + 6)) {
         toast_shown = 0;
+        ui.force = 1;
+    }
+    if (ccc.on && fm1_ms - ccc.t >= CC_CARD_MS && midi_pop_seq == ccc.seq) {   /* the knob card's time is up: the page
+                                                         * redrawn whole, before it is drawn (not after: the frame's
+                                                         * end clears a force) */
+        ccc.on = 0;
         ui.force = 1;
     }
 

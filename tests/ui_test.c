@@ -5316,6 +5316,28 @@ static int test_seq_keys(void)
     ui_power_on();
     return bad;
 }
+/* WaveLoop fork: a MIDI knob's card shows, then goes after CC_CARD_MS and leaves the page as a clean redraw has it */
+static int test_knob_card(void)
+{
+    static uint16_t shot[240 * 240];
+    uint32_t i, y, diff = 0;
+    int bad = 0;
+    ui_power_on();
+    go_home(); frame(); frame();
+    memcpy(shot, host_screen, sizeof shot);
+    midi_control(0, 74, 96);
+    frame();
+    for (y = CC_CARD_Y; y < CC_CARD_Y + CC_CARD_H; y++)
+        diff += memcmp(&host_screen[y * 240u], &shot[y * 240u], 480u) != 0;
+    bad += check("knob card: a CC74 turn draws it over the page", ccc.on && diff > 20u);
+    for (i = 0; i < CC_CARD_MS / 16u + 4u; i++)
+        frame();
+    memcpy(shot, host_screen, sizeof shot);
+    ui.force = 1; ui_draw();
+    bad += check("knob card: gone after CC_CARD_MS, the page whole again (as a full redraw)",
+                 !ccc.on && !memcmp(shot, host_screen, sizeof shot));
+    return bad;
+}
 int main(void)
 {
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -5323,6 +5345,7 @@ int main(void)
     bad += test_prophet_pages();
     bad += test_large_face();
     bad += test_home_notes();
+    bad += test_knob_card();
     bad += test_stage();
     bad += test_capture();
     bad += test_undo_levels();

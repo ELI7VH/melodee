@@ -33,7 +33,7 @@ change the track you are playing.
 
 Engines that do not list a knob ignore it.
 
-Every knob turn shows a card on the FM-1 for about a second: the track, the parameter and its value, with a bar.
+Every knob turn shows a card on the FM-1 for under a second: the track, the parameter and its value, with a bar.
 The line under the BPM and engine name at the top of the screen shows how far the selected sound is through its
 engine's factory sounds.
 
