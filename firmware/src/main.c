@@ -233,6 +233,7 @@ static void fm1_main(void)
     }
     glo_restore();                            /* CLK TUNE MIDI ROUT as last used, */
     project_boot();                           /* then the BOOT project or the template (theirs win) */
+    resume_load();                            /* WaveLoop fork: the sounds last used (no BOOT project) */
     fm1_delay_ms(400);
     if (boot_work.state != 2u)
         lcd_fill(0, 0, 240, 240, T_BG);

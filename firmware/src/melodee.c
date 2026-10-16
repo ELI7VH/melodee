@@ -105,6 +105,7 @@
 #endif
 #include "upreset.c"             /* user presets (RAM mirror; flash with MELODEE_FLASH) */
 #include "project.c"
+#include "resume_sounds.c"       /* WaveLoop fork: each track's sound kept and loaded at power-on */
 #include "cz_store.c"
 #include "fm6_store.c"            /* FM6: DX7 SysEx, the STORE shortcut to user presets */
 #if MELODEE_OTA

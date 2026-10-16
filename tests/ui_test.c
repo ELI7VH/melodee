@@ -103,6 +103,7 @@ static struct { uint32_t stage; } melodee_dbg;
 #include "../firmware/src/ui_layer.c"
 #include "../firmware/src/upreset.c"
 #include "../firmware/src/project.c"
+#include "../firmware/src/resume_sounds.c"     /* (WaveLoop fork: ui_input.c calls resume_save) */
 #include "../firmware/src/fm6_store.c"
 #include "demo_steps.h"
 /* the host screen blanked: the diff (gfx.c) forgets what it sent, as after a fill */
@@ -5319,6 +5320,34 @@ static int test_seq_keys(void)
     ui_power_on();
     return bad;
 }
+/* WaveLoop fork: the living set list (resume_sounds.c): a new song takes a free slot once it changes, the slot is
+ * remembered, and power-on loads it with every sound as it was left */
+static int test_resume_sounds(void)
+{
+    int bad = 0;
+    ui_power_on();
+    stop_transport();
+    memset(proj_slot, 0, sizeof proj_slot);
+    memset(proj_bank_slot, 0, sizeof proj_bank_slot);
+    project_new_blank();
+    settings_boot = 0; settings_autosave = 1;
+    resume_load();                                      /* (power-on: nothing kept yet, the start remembered) */
+    resume_save();
+    bad += check("living set list: an untouched new song takes no slot", proj_cur >= 4u && !project_used(0) && !project_used(1));
+    set_engine_of(&trk[1], 3u /* SID */); apply_preset_to(&trk[1], 3); trk[1].engine = trk[1].eng_req;
+    trk[1].p[P_ATK] = 77;                               /* (a tweak) */
+    resume_save();
+    bad += check("  a changed one takes a free slot and the slot is remembered", proj_cur < 4u && project_used(proj_cur) &&
+                 favorites.factory[RS_ROW][0] == RS_TAG && favorites.factory[RS_ROW][2] == proj_cur + 1u);
+    set_engine_of(&trk[1], ENGI_FM6); apply_preset_to(&trk[1], 0); proj_cur = 0xFFu;
+    resume_load();                                      /* (power-on) */
+    bad += check("  power-on loads it: track 2 SID preset 4 again, its tweak (ATK 77) too", proj_cur < 4u && trk[1].eng_req == 3u &&
+                 trk[1].preset == 3u && trk[1].p[P_ATK] == 77);
+    favorites.factory[RS_ROW][0] = 0;
+    memset(proj_slot, 0, sizeof proj_slot);
+    memset(proj_bank_slot, 0, sizeof proj_bank_slot);
+    return bad;
+}
 /* WaveLoop fork: a MIDI knob's card shows, then goes after CC_CARD_MS and leaves the page as a clean redraw has it */
 static int test_knob_card(void)
 {
@@ -5349,6 +5378,7 @@ int main(void)
     bad += test_large_face();
     bad += test_home_notes();
     bad += test_knob_card();
+    bad += test_resume_sounds();
     bad += test_stage();
     bad += test_capture();
     bad += test_undo_levels();
