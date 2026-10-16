@@ -43,7 +43,7 @@ its settings, press the encoder to change one. Program everything below, then pr
 | Encoder press | SHIFT + press the encoder | Channel Global, Assign CC, CC 115, Press 127, Release 0: next track |
 | Fader button 1 | press it | Channel Global, Mode CC, CC 112, Press 63, Release 64: previous engine |
 | Fader button 2 | press it | Channel Global, Mode CC, CC 112, Press 65, Release 64: next engine |
-| Pads 1–16 | press it | Channel 10, Mode NOTE, notes C1–D#2 (36–51), Latch Off: the DRUM track |
+| Pads 1–16 | press it | Channel 4, Mode NOTE, notes C1–D#2 (36–51), Latch Off: track 4 (put the drums there) |
 | Mod wheel | move it | Channel Global, CC 1 |
 | Pitch wheel | move it | Channel Global |
 
