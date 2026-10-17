@@ -35,11 +35,12 @@ its settings, press the encoder to change one. Program everything below, then pr
 | Knob 2 | turn it | Channel Global, CC 71: character (SID, Prophet) |
 | Knob 3 | turn it | Channel Global, CC 5: glide |
 | Knob 4 | turn it | Channel Global, CC 10: pan |
-| Knob 5 | turn it | Channel Global, CC 73: attack |
-| Knob 6 | turn it | Channel Global, CC 75: decay |
-| Knob 7 | turn it | Channel Global, CC 79: sustain (not on Prophet, FM6, CZ-1) |
-| Knob 8 | turn it | Channel Global, CC 72: release |
+| Knob 5 | turn it | Channel Global, CC 76: LFO rate |
+| Knob 6 | turn it | Channel Global, CC 77: LFO to filter (wobble) |
+| Knob 7 | turn it | Channel Global, CC 78: LFO to level (tremolo) |
+| Knob 8 | turn it | Channel Global, CC 70: LFO shape (SIN TRI SAW SQR S&H) |
 | Faders 1–4 | move it | Channel 1, 2, 3, 4 (one each), CC 7: track levels |
+| Faders 5–8 | move it | Channel Global, CC 73 / 75 / 79 / 72: attack, decay, sustain (not on Prophet, FM6, CZ-1), release |
 | Fader 9 | move it | Channel Global, CC 8: what you hear: down = the computer only, middle = both at full, up = the FM-1 only (USB connected) |
 | Encoder turn | SHIFT + turn the encoder | Channel Global, Message **CC RELTV**, CC 114, Type **Right 65, Left 63**: next / previous sound on the FM-1's selected track |
 | Encoder press | SHIFT + press the encoder | Channel Global, Assign CC, CC 115, Press 127, Release 0: next track |
@@ -49,7 +50,7 @@ its settings, press the encoder to change one. Program everything below, then pr
 | Mod wheel | move it | Channel Global, CC 1 |
 | Pitch wheel | move it | Channel Global |
 
-Faders 5–8 and the other buttons stay as they are.
+The other buttons stay as they are.
 
 ## What you see on the FM-1
 

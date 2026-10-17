@@ -3021,8 +3021,8 @@ const TEXT = {
     badEngine: "このファームウェアにないエンジンです: ", flashFail: "書き込みに失敗しました（rc {rc}）",
     installer: "Melodee インストーラー",
     tabSeq: "シーケンサー", tabTracks: "トラック", tabSettings: "設定", tabParams: "パラメーター",
-    paramsIntro: "全エンジンの変更できるパラメーターと範囲。タグは MiniLab / Oxygen のどのコントロールで動かせるかを示します。",
-    paramsTrack: "全トラック（全エンジン）", paramsGlobal: "グローバル", paramsNative: "ネイティブ・プログラム", paramsOwnEnv: "独自エンベロープ（K5 K6 K8）",
+    paramsIntro: "全エンジンの変更できるパラメーターと範囲。タグは MiniLab / Oxygen のどのコントロールで動かせるかを示します。（MiniLab ではノブ 5–8 がエンベロープ）",
+    paramsTrack: "全トラック（全エンジン）", paramsGlobal: "グローバル", paramsNative: "ネイティブ・プログラム", paramsOwnEnv: "独自エンベロープ（F5 F6 F8）",
     needDevice: "FM-1 を接続すると編集できます。", smpNone: "このファームウェアにはユーザーサンプルのスロットがありません。",
     bankConnect: "FM-1 を接続すると本体のユーザープリセットも扱えます。", bankNone: "このファームウェアにはユーザープリセットがありません。",
     mixer: "ミキサー", mixHelp: "本体の MIXER ページと同じ 4 トラック。フェーダーはレベル。パンはどのトラックも選択を変えずに書き込みます（0.8 のファームウェアでは一瞬そのトラックを選びます）。REC は本体での録音待機の表示です。",
@@ -3117,8 +3117,8 @@ const TEXT = {
     badEngine: "This firmware has no such engine: ", flashFail: "Write failed (rc {rc})",
     installer: "Melodee installer",
     tabSeq: "Sequencer", tabTracks: "Tracks", tabSettings: "Settings", tabParams: "Parameters",
-    paramsIntro: "Every engine and every parameter that can change, with its range. The tag names the MiniLab / Oxygen control that reaches it.",
-    paramsTrack: "Every track (all engines)", paramsGlobal: "Global", paramsNative: "native program", paramsOwnEnv: "its own envelope (K5 K6 K8)",
+    paramsIntro: "Every engine and every parameter that can change, with its range. The tag names the Oxygen control that reaches it (on the MiniLab, knobs 5–8 are the envelope).",
+    paramsTrack: "Every track (all engines)", paramsGlobal: "Global", paramsNative: "native program", paramsOwnEnv: "its own envelope (F5 F6 F8)",
     needDevice: "Connect the FM-1 to edit.", smpNone: "This firmware has no user sample slots.",
     bankConnect: "Connect the FM-1 to see its user presets too.", bankNone: "This firmware has no user presets.",
     mixer: "Mixer", mixHelp: "The four tracks of the device's MIXER page. The fader is the level. Pan is written to any track without changing the selection (firmware 0.8: by selecting it for a moment). REC shows a track armed for live recording on the device.",
@@ -3209,13 +3209,17 @@ function renderParams() {
     html += `<details><summary>${esc(e.name)}<span class="n">${n}${NATIVE_ENV.has(ei) ? " · " + esc(t("paramsOwnEnv")) : ""}</span></summary>` +
       `<table class="pt">${rows}${native}</table></details>`;
   });
-  const TAGS = { LVL: "FADER", ATK: "K5", DEC: "K6", SUS: "K7", REL: "K8", GLD: "K3", PAN: "K4" }, seen = new Set();
-  const list = (P) => P.map((d) => {
+  /* the Oxygen preset's controls (MiniLab: knobs 5-8 the envelope); TP by index: P_LEVEL 0, ATK..REL 1-4, LRATE 9,
+   * LWAVE 10, LD_FLT 14, LD_AMP 16 (firmware core.h) */
+  const TAGI = { 0: "F1-4", 1: "F5", 2: "F6", 3: "F7", 4: "F8", 9: "K5", 14: "K6", 16: "K7", 10: "K8" };
+  const TAGS = { GLD: "K3", PAN: "K4" }, seen = new Set();
+  const list = (P, byIndex) => P.map((d, i) => {
     if (!d || !d.label || d.label === "-") return "";
-    const tag = TAGS[d.label] && !seen.has(d.label) ? (seen.add(d.label), TAGS[d.label]) : "";
+    let tag = byIndex && TAGI[i] ? TAGI[i] : "";
+    if (!tag && TAGS[d.label] && !seen.has(d.label)) { seen.add(d.label); tag = TAGS[d.label]; }
     return row(d.label, d, tag);
   }).join("");
-  html += `<details><summary>${esc(t("paramsTrack"))}<span class="n">${TP.filter((d) => d && d.label).length}</span></summary><table class="pt">${list(TP)}</table></details>`;
+  html += `<details><summary>${esc(t("paramsTrack"))}<span class="n">${TP.filter((d) => d && d.label).length}</span></summary><table class="pt">${list(TP, true)}</table></details>`;
   html += `<details><summary>${esc(t("paramsGlobal"))}<span class="n">${GP.filter((d) => d && d.label).length}</span></summary><table class="pt">${list(GP)}</table></details>`;
   $("params").innerHTML = html;
   $("pfilter").addEventListener("input", () => {

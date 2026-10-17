@@ -1,24 +1,27 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* WaveLoop fork: HOME's controls page (ui.home_pg 2; HOME tapped on Stage). What every mapped control of the MiniLab /
  * Oxygen presets (controllers/) does on the selected track, condensed in two columns of rows: the eight knobs, each
- * its target's name on this engine, its value and a bar (a dash: this engine has nothing there); then the four faders
- * (each track's level, in its colour), the encoder (the sound), the engine buttons, the press and the pads. One table (KM_ROWS): a control mapped later is a row more. A cell redraws when what it shows changes. */
-enum { KM_CC, KM_LEVEL, KM_SOUND, KM_ENGINE, KM_PRESS, KM_PADS };
+ * its target's name on this engine, its value and a bar (a dash: this engine has nothing there), and the encoder (the
+ * sound); then the nine faders: 1-4 each track's level in its colour, 5-8 the envelope, 9 the monitor mix. One table
+ * (KM_CELLS): a control mapped later is a row more. A cell redraws when what it shows changes. */
+enum { KM_CC, KM_LEVEL, KM_SOUND, KM_ENGINE, KM_PRESS, KM_PADS, KM_MIX };
 typedef struct {
     uint8_t kind, arg;                                   /* KM_CC: the CC; KM_LEVEL: the track */
     const char *src;                                     /* the control, as printed on the hardware ("K1") */
 } km_cell_t;
-static const km_cell_t KM_CELLS[16] = {
+#define KM_N 18u
+#define KM_ROWS 9u
+static const km_cell_t KM_CELLS[KM_N] = {
     {KM_CC, 74, "K1"}, {KM_CC, 71, "K2"}, {KM_CC, 5, "K3"}, {KM_CC, 10, "K4"},
-    {KM_CC, 73, "K5"}, {KM_CC, 75, "K6"}, {KM_CC, 79, "K7"}, {KM_CC, 72, "K8"},
+    {KM_CC, 76, "K5"}, {KM_CC, 77, "K6"}, {KM_CC, 78, "K7"}, {KM_CC, 70, "K8"}, {KM_SOUND, 0, "ENC"},
     {KM_LEVEL, 0, "F1"}, {KM_LEVEL, 1, "F2"}, {KM_LEVEL, 2, "F3"}, {KM_LEVEL, 3, "F4"},
-    {KM_SOUND, 0, "ENC"}, {KM_ENGINE, 0, "BNK"}, {KM_PRESS, 0, "NEXT"}, {KM_PADS, 3, "PAD"},
+    {KM_CC, 73, "F5"}, {KM_CC, 75, "F6"}, {KM_CC, 79, "F7"}, {KM_CC, 72, "F8"}, {KM_MIX, 0, "F9"},
 };
-#define KM_Y 34                                          /* two columns of eight rows: the knobs, then the rest */
+#define KM_Y 32                                          /* two columns of nine rows: the knobs, then the faders */
 #define KM_W 116
-#define KM_H 23
-#define KM_GAP 2
-static uint32_t km_sig[16];
+#define KM_H 21
+#define KM_GAP 1
+static uint32_t km_sig[KM_N];
 
 /* cell k: its name (what the control does here), its value, the bar (fill 0..1000, -1 none; bipolar: from the middle) */
 static void km_cell(uint32_t k, char *name, char *val, int32_t *fill, int *bip, uint16_t *bar)
@@ -62,6 +65,15 @@ static void km_cell(uint32_t k, char *name, char *val, int32_t *fill, int *bip, 
         }
     } else if (c->kind == KM_SOUND) {
         sound_name(t, val);                             /* (no name: the value across the row) */
+    } else if (c->kind == KM_MIX) {                     /* the monitor crossfade (wl_mix.h): computer / FM-1 */
+        str_cpy(name, "MIX", 16);                       /* BOTH; or the side turned down and how far: FM 40 / PC 40 */
+        if (wl_mix == 64u) {
+            str_cpy(val, "BOTH", 16);
+        } else {
+            str_cpy(val, wl_mix < 64u ? "FM " : "PC ", 16);
+            fmt_int(val + 3, wl_mix_pct(wl_mix, wl_mix > 64u));
+        }
+        *fill = wl_mix * 1000 / 127;
     } else if (c->kind == KM_ENGINE) {
         str_cpy(val, ENGINES[eng_idx(t->eng_req)]->name, 16);
     } else if (c->kind == KM_PRESS) {
@@ -75,7 +87,7 @@ static void km_cell(uint32_t k, char *name, char *val, int32_t *fill, int *bip, 
 static void km_draw_cell(uint32_t k)
 {
     char name[24], val[32];
-    int32_t fill, x = BOX_X + (int32_t)(k / 8u) * (KM_W + 4), y = KM_Y + (int32_t)(k % 8u) * (KM_H + KM_GAP);
+    int32_t fill, x = BOX_X + (int32_t)(k / KM_ROWS) * (KM_W + 4), y = KM_Y + (int32_t)(k % KM_ROWS) * (KM_H + KM_GAP);
     int bip;
     uint16_t bar, src = KM_CELLS[k].kind == KM_LEVEL && KM_CELLS[k].arg < trk_n() ? T_TRK(KM_CELLS[k].arg) : T_MID;
     uint32_t sig;
@@ -115,6 +127,6 @@ static void knobmap_draw(void)
         return;
     if (ui.force)
         lcd_fill(0, H_HEAD, 240, 240u - H_HEAD, T_BG);
-    for (k = 0; k < 16u; k++)
+    for (k = 0; k < KM_N; k++)
         km_draw_cell(k);
 }

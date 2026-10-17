@@ -258,6 +258,9 @@ static uint32_t midi_cc_id(const track_t *t, uint32_t cc)
     uint32_t id=P_COUNT;
     switch(cc){case 5:id=P_GLIDE;break;case 7:id=P_LEVEL;break;case 10:id=P_PAN;break;
     case 72:id=P_REL;break;case 73:id=P_ATK;break;case 75:id=P_DEC;break;
+    case 76:id=P_LRATE;break;case 77:id=P_LD_FLT;break;case 78:id=P_LD_AMP;break;case 70:id=P_LWAVE;break;
+                                                         /* (WaveLoop fork: knobs 5-8, the track's LFO: rate, filter
+                                                          * wobble, tremolo, shape; ADSR is on faders 5-8) */
     case 79:return motion_native_tag(t)?P_COUNT:P_SUS;   /* WaveLoop fork: sustain (the engines with their own envelope:
                                                          * none) */
     case 74:case 71:{
