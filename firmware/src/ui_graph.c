@@ -338,7 +338,7 @@ static void graph_recorded_notes(const track_t *t, uint16_t c)
  * underlaid RAISE, the cursor framed in TEXT; a TEXT bar over the step playing */
 static void graph_grid(const track_t *t, uint16_t c)
 {
-    uint32_t l, i, len = (uint32_t)t->p[P_SLEN], base = ui.bank * 16u, sound = ui.drum_sound % drum_sound_count(t);
+    uint32_t l, i, len = (uint32_t)t->p[P_SLEN], base = ui.bank * 16u, sound = drum_sound_norm(t, ui.drum_sound);
     int32_t y0 = 6;
     for (l = 0; l < NLANE; l++) {
         int32_t y = y0 + 4 + (int32_t)l * 14;

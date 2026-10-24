@@ -320,6 +320,16 @@ static int drum_patch_valid(const drum_patch_t *p)
     for(uint32_t i=0;i<16;i++)if(p->c[i][0]<-24 || p->c[i][0]>24 || p->c[i][1]<-64 || p->c[i][1]>63 || p->c[i][2]<-64 || p->c[i][2]>63 || p->c[i][3]<0)return 0;
     return 1;
 }
+/* WaveLoop fork: each drum's place in the mix, against its track's: PAN added to the track's PAN, SEND to its SEND;
+ * zero = as the track (eng_drum.c drum_control.c). The drum picked on each track, to shape (drum_focus) */
+typedef struct { int8_t pan[16], send[16]; } drum_mix_t;
+static drum_mix_t drum_mix[NTRK] __attribute__((section(".pool")));
+static uint8_t drum_focus[NTRK] __attribute__((section(".pool")));
+static int drum_mix_valid(const drum_mix_t *m)
+{
+    for(uint32_t i=0;i<16;i++)if(m->pan[i]<-64 || m->pan[i]>63 || m->send[i]<-127)return 0;
+    return 1;
+}
 #define DRUM_WIRE_BYTES 54u /* 16 voices x (6-bit tune, 7-bit decay/character/attenuation) */
 static void drum_patch_pack(uint8_t *b,const drum_patch_t *p)
 {

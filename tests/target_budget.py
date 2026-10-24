@@ -22,6 +22,9 @@ FUNCS = ["phase_render", "sid_render", "cz_native_render", "cz_native_wave", "fo
          "px_string_excite", "px_string_run", "px_symp_run",
          "dr_bd", "dr_sd", "dr_tom", "dr_rs", "dr_cl", "dr_cp", "dr_ma", "dr_metal", "dr_cb", "dr_cy", "dr_hat", "dr8_run",   # drum_808.c
          "drum_source", "drum_limit", "drum_color", "dr_metal_tune",
+         "dv_kick_run", "dv_snare_run", "dv_clap_run", "dv_hat_run", "dv_tom_run", "dv_rim_run", "dv_bell_run",
+         "dv_metal_run", "dv_metal_mix", "dv_out", "dvk_source",   # drum_voice.c: KIT 808, CR78 (WaveLoop fork)
+         "mix_drum_samples", "drum_bus_sum",                     # each drum on its own bus (drum_control.c)
          "d9_render_bd", "d9_render_sd", "d9_render_tom", "d9_render_rim", "d9_render_clap", "d9_render_smp",
                                    # SLICE (eng_slice.c): the render, the reverse windows
          "fm1_alnk0_irq", "track_render_audio",       # per-track renderer has its own bounded function

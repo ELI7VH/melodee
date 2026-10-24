@@ -103,7 +103,8 @@ struct dsk_part {                              /* (dsk_part_t: eng_drum.c) */
     uint16_t cycle_frac, dlen;                 /* SID cycles left over (Q16); the digi's samples */
     uint8_t ready, quiet, digi, dsmp, dlane, dlevel;
 };
-_Static_assert(sizeof(dsk_part_t) < sizeof(drum909_part_t) && sizeof(dsk_part_t) != sizeof(drum_lane_t) * DV_NLANE,
+_Static_assert(sizeof(dsk_part_t) < sizeof(drum909_part_t) && sizeof(dsk_part_t) != sizeof(dr8_part_t) &&
+               sizeof(dsk_part_t) != sizeof(dvk_part_t),
                "the SID kit's state: within the DRUM pool, its own size (resource_get keys on it)");
 static dsk_part_t *dsk_part(uint32_t part);   /* engines.c: the part's runtime pool */
 static uint32_t dsk_bytes(void) { return sizeof(dsk_part_t); }

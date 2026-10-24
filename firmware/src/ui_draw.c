@@ -637,6 +637,30 @@ static void draw_foot(void)
     }
     cv_blit(0, Y_FOOT);
 }
+/* DRUM SOUND, DRUM MIX, Stage on a DRUM track: the picked drum (id 0) and its fields (1 + DCF_*, drum_control.c) */
+static void drum_columns(const page_t *pg)
+{
+    uint32_t sound = drum_sound_norm(TSEL, ui.drum_sound), c;
+    for (c = 0; c < 4u; c++) {
+        uint32_t f = pg->id[c];
+        const param_desc_t *d = f && f <= DCF_COUNT ? drum_field_desc(TSEL, sound, f - 1u) : 0;
+        char val[12];
+        const char *unit;
+        int32_t v;
+        if (!f) {
+            draw_column(c, "DRUM", drum_sound_name(TSEL, sound), "", VAL(c), -1, ICON_AUTO);
+            continue;
+        }
+        if (!d || d->max <= d->min) {
+            draw_column(c, "", "", "", T_THEME, -1, ICON_NONE);
+            continue;
+        }
+        v = drum_field_get(TSEL, sound, f - 1u);
+        param_format(d, v, val, &unit);
+        draw_column(c, d->label, val, unit, VAL(c), RATIO(d, v), f - 1u == DCF_PITCH ? ICON_PITCH : f - 1u == DCF_DECAY ?
+                    ICON_GATE : ICON_AUTO);
+    }
+}
 #include "ui_sections.c"                                /* the EDIT pages in sections, the map */
 #include "ui_stage.c"                                   /* Stage (HOME) */
 #include "ui_view.c"                                    /* HOME's second page: the chord, pictures of what plays */
@@ -648,18 +672,11 @@ static void draw_columns(void)
 {
     if (own_screen() && col_style != CS_CAPTURE)         /* own screens have no cards; lists still need their values */
         return;
-    if(cur_page()->scope==SC_DRUM){
-        char v[12];uint32_t sound=ui.drum_sound%drum_sound_count(TSEL);const int8_t *c=drum_patch[song.sel].c[sound];
-        draw_column(0,"DRUM",drum_sound_name(TSEL,sound),"",VAL(0u),-1,ICON_AUTO);
-        if(cur_page()->id[1]==4){fmt_int(v,127-c[3]);draw_column(1,"LEVEL",v,"",VAL(1u),-1,ICON_AUTO);draw_column(2,"","","",T_THEME,-1,ICON_NONE);draw_column(3,"","","",T_THEME,-1,ICON_NONE);return;}
-        fmt_int(v,c[0]);draw_column(1,"TUNE",v,"ST",VAL(1u),-1,ICON_PITCH);
-        fmt_int(v,c[1]+64);draw_column(2,"DECAY",v,"",VAL(2u),-1,ICON_GATE);
-        fmt_int(v,c[2]+64);draw_column(3,(drum_is909(TSEL)?drum_character(sound):drum_issid(TSEL)?"SNAP":sound==D9_SD?"SNAPPY":"TONE"),v,"",VAL(3u),-1,ICON_AUTO);return;
-    }
+    if(cur_page()->scope==SC_DRUM){drum_columns(cur_page());return;}
     if(cur_page()->scope==SC_DRUMHIT){
         char v[12];uint32_t i=drum_hit_selected();const recorded_note_t *r=i<RECORD_MAX?&recording[i]:0;
         fmt_int(v,ui.cursor+1);draw_column(0,"STEP",v,"",VAL(0u),-1,ICON_AUTO);
-        draw_column(1,"DRUM",drum_sound_name(TSEL,ui.drum_sound%drum_sound_count(TSEL)),"",VAL(1u),-1,ICON_AUTO);
+        draw_column(1,"DRUM",drum_sound_name(TSEL,drum_sound_norm(TSEL,ui.drum_sound)),"",VAL(1u),-1,ICON_AUTO);
         fmt_int(v,r?r->pitch:0);draw_column(2,"PITCH",v,"ST",VAL(2u),-1,ICON_PITCH);
         if(r && r->length){uint32_t x=((uint32_t)r->duration*(1u<<(r->owner>>5))*100u+RECORD_UNIT/2)/RECORD_UNIT;fmt_int(v,x/100);str_cpy(v+str_len(v),".",2);if(x%100<10)str_cpy(v+str_len(v),"0",2);fmt_int(v+str_len(v),x%100);}
         else str_cpy(v,"FREE",sizeof v);
@@ -1182,6 +1199,16 @@ static void draw_cc_card(void)
         fmt_int(e + 3, wl_mix_pct(ccc.v, 0));
         unit = "%";
         fill = ccc.v * (BOX_W - 20) / 127;
+    } else if (ccc.id & MIDI_POP_DRUM) {                /* a drum of the kit (drum_control.c): "T4 KICK PITCH" */
+        const track_t *t = &trk[ccc.trk % NTRK];
+        uint32_t sound = (ccc.id >> 4) & 15u;
+        const param_desc_t *d = drum_field_desc(t, sound, ccc.id & 15u);
+        str_cpy(lab + 3, drum_sound_name(t, sound), 12);
+        str_cpy(lab + str_len(lab), " ", 2);
+        str_cpy(lab + str_len(lab), d->label, 12);
+        param_format(d, ccc.v, val, &unit);
+        if (d->max > d->min)
+            fill = (ccc.v - d->min) * (BOX_W - 20) / (d->max - d->min);
     } else if (ccc.id < P_COUNT) {
         const track_t *t = &trk[ccc.trk % NTRK];
         const param_desc_t *d = ccc.id < P_E0 ? &TP[ccc.id] : &ENGINES[eng_idx(t->eng_req)]->edit[ccc.id - P_E0];

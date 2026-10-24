@@ -64,6 +64,21 @@ d9_render_tom 3064
 d9_render_rim 4383
 d9_render_clap 1047
 d9_render_smp 1444
+# WaveLoop fork: KIT 808 and CR78 (the Kit's drum_voice.c), as measured on their first build; each drum's own bus
+# (mix_drum_samples: 2 or 4 multiply-adds per voice and sample, only with a drum PAN or SEND set).
+dv_kick_run 151
+dv_snare_run 154
+dv_clap_run 74
+dv_hat_run 61
+dv_tom_run 75
+dv_rim_run 59
+dv_bell_run 51
+dv_metal_run 26
+dv_metal_mix 16
+dv_out 35
+dvk_source 10
+mix_drum_samples 363
+drum_bus_sum 32
 
 # Native fp32 Prophet kernels, r3 + fprev1 disassembly.
 p5_samples 1075

@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* WaveLoop fork: HOME's controls page (ui.home_pg 2; HOME tapped on Stage). What every mapped control of the MiniLab /
  * Oxygen presets (controllers/) does on the selected track, condensed in two columns of rows: the eight knobs, each
- * its target's name on this engine, its value and a bar (a dash: this engine has nothing there), and the encoder (the
+ * its target's name on this engine (a DRUM track: the picked drum's, "BD PITCH"), its value and a bar (a dash: this
+ * engine has nothing there), and the encoder (the
  * sound); then the nine faders: 1-4 each track's level in its colour, 5-8 the envelope, 9 the monitor mix. One table
  * (KM_CELLS): a control mapped later is a row more. A cell redraws when what it shows changes. */
 enum { KM_CC, KM_LEVEL, KM_SOUND, KM_ENGINE, KM_PRESS, KM_PADS, KM_MIX };
@@ -39,6 +40,19 @@ static void km_cell(uint32_t k, char *name, char *val, int32_t *fill, int *bip, 
         uint32_t id = midi_cc_id(t, c->arg);
         if (id == P_COUNT) {
             str_cpy(name, "-", 16);
+        } else if (id & MIDI_POP_DRUM) {                /* the picked drum's field ("BD PITCH": drum_control.c) */
+            uint32_t sound = drum_picked(t);
+            const param_desc_t *d = drum_field_desc(t, sound, id & 15u);
+            int32_t v = drum_field_get(t, sound, id & 15u);
+            str_cpy(name, drum_sound_abbr(t, sound), 16);
+            str_cpy(name + str_len(name), " ", 2);
+            str_cpy(name + str_len(name), d->label, 12);
+            param_format(d, v, val, &unit);
+            if (unit && unit[0] == '%')
+                str_cpy(val + str_len(val), unit, 8);
+            if (d->max > d->min)
+                *fill = (v - d->min) * 1000 / (d->max - d->min);
+            *bip = (id & 15u) == DCF_PAN;
         } else if (id & MIDI_POP_NATIVE) {              /* the engine's own envelope */
             str_cpy(name, c->arg == 73u ? "ATK" : c->arg == 75u ? "DEC" : "REL", 16);
             str_cpy(val, "ENG", 16);

@@ -173,6 +173,57 @@ static __attribute__((noinline,section(".dsp_text"))) void mix_fx_samples(track_
     }
     solo_gain[ti]=gain;t->peak=pk;
 }
+/* WaveLoop fork: a DRUM track whose drums have a PAN or a SEND of their own (eng_drum.c drum_control.c): every voice
+ * rendered on its own bus, its drum's pan (the track's plus the drum's) and send (the track's SEND plus the drum's: the
+ * shared chain, or SEND 1 when SPLIT; SEND 2 and 3 take the track's output as ever, mix_extra_sends) with the track's
+ * LEVEL here, solo's ramp as mix_solo's. The kit's sum (part_buf: drum_bus_sum) keeps the meter and the stem. A track
+ * insert takes the kit as one (the sum, as before). A kit with nothing set never comes here */
+static __attribute__((noinline)) void drum_bus_sum(const track_t *t,int32_t *b,uint32_t n)
+{
+    uint32_t ti=(uint32_t)(t-trk),used=drum_bus_used[ti];
+    for(uint32_t k=0;k<DRUM_BUSES;k++)if((used>>k)&1u){const int32_t *x=drum_bus_now[ti][k];for(uint32_t i=0;i<n;i++)b[i]+=x[i];}
+}
+static __attribute__((noinline,section(".audio_text"))) void mix_drum_samples(track_t *t,uint32_t n)
+{
+    uint32_t ti=(uint32_t)(t-trk),used=drum_bus_used[ti],k,i;
+    int32_t lvl=LEVEL_Q12[t->p[P_LEVEL]&127],pk=t->peak,from=solo_gain[ti],to=!track_solo || ((track_solo>>ti)&1u)?32768:0;
+    int32_t *b=part_buf;
+    if(from!=32768 || to!=32768){                       /* (solo's ramp: the sum and every bus) */
+        for(i=0;i<n;i++){
+            uint32_t g;
+            from+=clamp(to-from,-256,256);g=(uint32_t)from<<1;
+            b[i]=mulq16(b[i],g);
+            for(k=0;k<DRUM_BUSES;k++)if((used>>k)&1u)drum_bus_now[ti][k][i]=mulq16(drum_bus_now[ti][k][i],g);
+        }
+        solo_gain[ti]=from;
+    }
+    for(k=0;k<DRUM_BUSES;k++){
+        if(!((used>>k)&1u))continue;
+        uint32_t sound=(uint32_t)t->v[k].s[6]&15u;
+        int32_t pan=clamp(t->p[P_PAN]+drum_mix[ti].pan[sound],-64,63);
+        int32_t gl=((4096-(pan>0?pan*64:0))*lvl)>>12,gr=((4096+(pan<0?pan*64:0))*lvl)>>12;   /* pan x LEVEL, Q12 */
+        const int32_t *x=drum_bus_now[ti][k];
+        if(fx_send_on){
+            int32_t s=clamp(t->p[P_FXSEND]+drum_mix[ti].send[sound],0,127),g=(s+(s==127))*512;   /* (fx_send_gain's) */
+            int32_t sl=(int32_t)(((int64_t)gl*g)>>16),sr=(int32_t)(((int64_t)gr*g)>>16);
+            for(i=0;i<n;i++){                           /* (>> 2 first: x LEVEL fits 32 bits, as mix_mono_samples) */
+                int32_t y=clamp(x[i],-884000,884000)>>2;
+                mix_l[i]+=(y*gl)>>10;mix_r[i]+=(y*gr)>>10;fx_send_l[i]+=(y*sl)>>10;fx_send_r[i]+=(y*sr)>>10;
+            }
+        }else for(i=0;i<n;i++){
+            int32_t y=clamp(x[i],-884000,884000)>>2;
+            mix_l[i]+=(y*gl)>>10;mix_r[i]+=(y*gr)>>10;
+        }
+    }
+    for(i=0;i<n;i++){                                   /* the kit as one: its meter, its stem */
+        int32_t x=clamp(((clamp(b[i],-884000,884000)>>2)*lvl)>>10,-524287,524287),a=x<0?-x:x;
+        if(a>pk)pk=a;
+#if MELODEE_USB_AUDIO
+        if(track_capture_on)track_capture[i*NTRK+ti]=x;
+#endif
+    }
+    t->peak=pk;
+}
 #if MELODEE_BATCH_AUDIO && !MELODEE_LEGACY_EXTRAS
 static int32_t batch_pcm[NPART][CTL],batch_spread[NPART][CTL];
 static uint32_t batch_rendered[NPART];static uint8_t batch_spread_on[NPART],batch_ready;
@@ -184,6 +235,7 @@ static __attribute__((noinline)) void mix_prepare_batch(uint32_t n,uint32_t nt) 
     for(uint32_t p=0;p<nt;p++){
         track_t *t=&trk[p];mod_begin(t);batch_mod[p]=mod;memcpy(batch_params[p],t->p,sizeof t->p);
         spread_on=t->p[P_SPRD]>0 && (trk_vmode(t)==V_POLY || trk_vmode(t)==V_UNISON);
+        if(drum_mix_begin(t,fx_send_on))spread_on=0;     /* (each drum its own place: no SPREAD sides) */
         batch_spread_on[p]=spread_on;spread_buf=batch_spread[p];
         batch_rendered[p]=track_render_audio(t,batch_pcm[p],n,0);
         if(mod.on)mod_end(t);
@@ -217,17 +269,22 @@ static __attribute__((noinline)) void mix_part(track_t *t,uint32_t n)
     {
         part_buf=part_storage;spread_buf=spread_storage;mod_begin(t);
         spread_on=t->p[P_SPRD]>0 && (trk_vmode(t)==V_POLY || trk_vmode(t)==V_UNISON);
+        if(drum_mix_begin(t,fx_send_on))spread_on=0;
         rendered=(int)track_render_audio(t,part_buf,n,0);
     }
 #if defined(MELODEE_FX_PROFILE) && MELODEE_FX_PROFILE && defined(FM1_IRQ_TARGET)
     if(fx_profile_control>>30u && fx_profile_track((uint32_t)(t-trk))){for(uint32_t i=0;i<n;i++)part_buf[i]=((i&8u)?-8000:8000)+(int32_t)i*97;rendered=1;spread_on=0;}
 #endif
     AP_START(mix_start);
+    uint32_t drums=drum_bus_now[(uint32_t)(t-trk)]!=0;  /* (its drums on their own buses: drum_mix_begin) */
+    if(rendered && drums)drum_bus_sum(t,part_buf,n);
     if(rendered || fx_active(t)){
         if(!rendered){memset(part_buf,0,n*sizeof *part_buf);if(spread_on)memset(spread_buf,0,n*sizeof *spread_buf);}
         AP_START(fx_start);int wet=fx_process(t,part_buf,n);AP_END(AP_FX,fx_start);
         if(wet){
             void (*volatile run)(track_t *,uint32_t)=mix_fx_samples;run(t,n);
+        }else if(drums && rendered){
+            void (*volatile run)(track_t *,uint32_t)=mix_drum_samples;run(t,n);
         }else{
             mix_solo(t,part_buf,n);
             if(spread_on)mix_spread(t,part_buf,n);
@@ -240,6 +297,7 @@ static __attribute__((noinline)) void mix_part(track_t *t,uint32_t n)
         }
     }
     AP_END(AP_MIX,mix_start);
+    drum_bus_now[(uint32_t)(t-trk)]=0;                  /* (until the next block's drum_mix_begin) */
     if(mod.on)mod_end(t);
     if(extra){void (*volatile run)(uint32_t)=mix_extra_sends;run(n);}
 }

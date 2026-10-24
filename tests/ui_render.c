@@ -1336,8 +1336,8 @@ static void setup(int s)
     case S_MENU_COUNTIN: ui.menu=1;ui.menu_sel=MI_COUNTIN;settings_countin=2;break;
     case S_MENU_PREVIEW: ui.menu=1;ui.menu_sel=MI_PREVIEW;settings_preview=1;break;
     case S_DRUM_SOUND_808: case S_DRUM_SOUND_909: case S_DRUM_MIX_909: case S_DRUM_HIT_909: case S_DRUM_HIT_FREE: case S_DRUM_HIT_LONG:
-        drum(s==S_DRUM_SOUND_808?DK_808:DK_909);eng(ENGI_DRUM);TSEL->p[P_E0]=s==S_DRUM_SOUND_808?DK_808:DK_909;TSEL->engine=TSEL->eng_req;TSEL->preset=s==S_DRUM_SOUND_808?0:1;song.playing=0;
-        ui.drum_sound=s==S_DRUM_SOUND_808?12:D9_SD;ui.lane=(uint8_t)drum_lane(drum_sound_note(TSEL,ui.drum_sound));ui.cursor=4;
+        drum(s==S_DRUM_SOUND_808?DK_KIT808:DK_909);eng(ENGI_DRUM);TSEL->p[P_E0]=s==S_DRUM_SOUND_808?DK_KIT808:DK_909;TSEL->engine=TSEL->eng_req;TSEL->preset=s==S_DRUM_SOUND_808?0:1;song.playing=0;
+        ui.drum_sound=s==S_DRUM_SOUND_808?D9_BD:D9_SD;   /* (808: the Kit's kick, WaveLoop fork) */ui.lane=(uint8_t)drum_lane(drum_sound_note(TSEL,ui.drum_sound));ui.cursor=4;
         drum_patch[song.sel].c[ui.drum_sound][0]=-12;drum_patch[song.sel].c[ui.drum_sound][1]=31;drum_patch[song.sel].c[ui.drum_sound][2]=16;drum_patch[song.sel].c[ui.drum_sound][3]=40;
         if(s==S_DRUM_HIT_909 || s==S_DRUM_HIT_FREE || s==S_DRUM_HIT_LONG){recording_restore_note(TSEL,0,(recorded_note_t){27000,16384,38,100,(uint8_t)recording_owner(TSEL),4,7,s==S_DRUM_HIT_909});if(s==S_DRUM_HIT_LONG){recording[0].duration=65535;recording[0].owner|=224;recording[0].length=1;}ui.note_pick=1;ui.note_identity=recording[0];ui.note_generation=recording_generation;TSEL->step[4].flags|=SF_RECORDED;go_title("DRUM HIT");}
         else go_title(s==S_DRUM_MIX_909?"DRUM MIX":"DRUM SOUND");

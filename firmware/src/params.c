@@ -525,7 +525,7 @@ static const page_t PAGES[] = {
     {"EDIT 1", FAM_EDIT, SC_ENGINE, GR_NONE, {P_E0, P_E1, P_E2, P_E3}},
     {"EDIT 2", FAM_EDIT, SC_ENGINE, GR_NONE, {P_E4, P_E5, P_E6, P_E7}},
     {"DRUM SOUND",FAM_EDIT,SC_DRUM,GR_NONE,{0,1,2,3}},
-    {"DRUM MIX",FAM_EDIT,SC_DRUM,GR_NONE,{0,4,255,255}},
+    {"DRUM MIX",FAM_EDIT,SC_DRUM,GR_NONE,{0,4,5,6}},    /* (1 + DCF_*: LEVEL PAN SEND, drum_control.c) */
     /* FM6 only (page_visible): the patch as the DX7 has it, its operators (PRESETS picks one), the functions */
     {"P5 STORE",FAM_EDIT,SC_P5STORE,GR_NONE,{0,1,2,3}},
     {"P5 OSC A",FAM_EDIT,SC_P5,GR_NONE,{0,3,4,8}},

@@ -84,6 +84,10 @@ static void stage_columns(void)
 {
     const page_t *sp = stage_page();
     uint32_t c;
+    if (sp->scope == SC_DRUM) {                        /* (the picked drum: ui_draw.c drum_columns) */
+        drum_columns(sp);
+        return;
+    }
     for (c = 0; c < 4u; c++) {
         int16_t *vp;
         const char *unit;

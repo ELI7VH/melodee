@@ -748,12 +748,36 @@ static void page_go(int32_t d)
     cursor_set((int32_t)(b * 16u + ui.cursor % 16u < len ? b * 16u + ui.cursor % 16u : len - 1u));
 }
 
-/* the drum DRUM HIT's KNOB 2 (DRUM SOUND / MIX: KNOB 1) picks and the grid's lane, together: the lane key lit, the
- * band and the DRUM shown agree. A lane key, the grid's LANE: the lane's own drum */
+/* the drum DRUM HIT's KNOB 2 (DRUM SOUND / MIX, Stage on a DRUM track: KNOB 1) picks and the grid's lane, together:
+ * the lane key lit, the band and the DRUM shown agree. A lane key, the grid's LANE: the lane's own drum. It is the
+ * track's picked drum (drum_focus: the controller's knobs shape it too, midi_control.c) */
 static void drum_pick(uint32_t sound)
 {
     ui.drum_sound = (uint8_t)sound;
     ui.lane = (uint8_t)drum_lane(drum_sound_note(TSEL, sound));
+    drum_focus[song.sel % NTRK] = (uint8_t)sound;
+    ui.force = 1;
+}
+/* WaveLoop fork: a drum played live on the selected track (a key, a pad, a MIDI note: eng_drum.c drum_focus_note) is
+ * the one picked, on every page: its knobs and cards follow it, the grid's lane with it */
+static void drum_follow(void)
+{
+    uint32_t hit, sound;
+    if (!drum_focus_hit)
+        return;
+    fm1_irq_off();
+    hit = drum_focus_hit;
+    drum_focus_hit = 0;
+    fm1_irq_on();
+    if (!((hit >> song.sel) & 1u) || !drum_track(TSEL))
+        return;
+    sound = drum_picked(TSEL);
+    if (sound == ui.drum_sound)
+        return;
+    ui.drum_sound = (uint8_t)sound;
+    ui.lane = (uint8_t)drum_lane(drum_sound_note(TSEL, sound));
+    if (cur_page()->scope == SC_DRUMHIT)
+        ui.note_pick = 0;
     ui.force = 1;
 }
 static void drum_pick_lane(uint32_t lane)
@@ -813,27 +837,31 @@ static uint32_t drum_hit_selected(void)
 {
     uint32_t selected=ui.note_pick?ui.note_pick-1u:RECORD_MAX, first=RECORD_MAX;
     for(uint32_t i=recording_head[recording_owner(TSEL)];i<RECORD_MAX;i=recording_next[i]){
-        if(!recording_active(TSEL,i) || recording_view(TSEL,&recording[i])!=ui.cursor || drum_sound_of(TSEL,recording[i].note)!=ui.drum_sound%drum_sound_count(TSEL))continue;
+        if(!recording_active(TSEL,i) || recording_view(TSEL,&recording[i])!=ui.cursor || drum_sound_of(TSEL,recording[i].note)!=drum_sound_norm(TSEL,ui.drum_sound))continue;
         if(i==selected)return i;
         if(first==RECORD_MAX || recording[i].on<recording[first].on)first=i;
     }
     return first;
 }
+/* DRUM SOUND, DRUM MIX, Stage on a DRUM track: KNOB 1 the drum (field 0), the others its fields (1 + DCF_*:
+ * drum_control.c) */
 static void drum_sound_edit(uint32_t slot,int32_t delta)
 {
-    ui.drum_sound%=drum_sound_count(TSEL);
-    uint32_t field=cur_page()->id[slot];
+    ui.drum_sound=(uint8_t)drum_sound_norm(TSEL,ui.drum_sound);
+    uint32_t field=cur_page()->id[slot],sound=ui.drum_sound;
     if(!field){drum_pick(drum_sound_step(TSEL,ui.drum_sound,delta));return;}
-    if(field==255)return;
+    if(field>DCF_COUNT)return;
+    const param_desc_t *d=drum_field_desc(TSEL,sound,field-1u);
+    if(d->max<=d->min)return;
+    int32_t v=clamp(drum_field_get(TSEL,sound,field-1u)+(field-1u==DCF_PITCH?delta:accel(EN_K1+slot,delta,d->max-d->min)),d->min,d->max);
     fm1_irq_off();
-    if(field==4){int8_t *p=&drum_patch[song.sel].c[ui.drum_sound][3];*p=(int8_t)clamp(*p-delta,0,127);}
-    else {int8_t *p=&drum_patch[song.sel].c[ui.drum_sound][field-1];*p=(int8_t)clamp(*p+delta,field==1?-24:-64,field==1?24:63);}
+    drum_field_set(TSEL,sound,field-1u,v);
     fm1_irq_on();ui.force=1;
 }
 static void drum_hit_jog(int32_t delta);
 static void drum_hit_edit(uint32_t slot,int32_t delta)
 {
-    ui.drum_sound%=drum_sound_count(TSEL);
+    ui.drum_sound=(uint8_t)drum_sound_norm(TSEL,ui.drum_sound);
     if(!slot){drum_hit_jog(delta);return;}         /* KNOB 1: the hits one by one, the steps */
     if(slot==1){drum_pick(drum_sound_step(TSEL,ui.drum_sound,delta));ui.note_pick=0;notes_preview();return;}
     if(chain_busy() || live_rec_sel()){ui_message("STOP TO EDIT");return;}
@@ -881,7 +909,7 @@ static void drum_hit_delete(void)
 {
     if(chain_busy() || live_rec_sel()){ui_message("STOP TO EDIT");return;}
     step_history_end();step_history_finish();fm1_irq_off();step_history_sync_locked();
-    uint32_t i=drum_hit_selected(),sound=ui.drum_sound%drum_sound_count(TSEL);int32_t had=step_sound_note(TSEL,&TSEL->step[ui.cursor],sound);
+    uint32_t i=drum_hit_selected(),sound=drum_sound_norm(TSEL,ui.drum_sound);int32_t had=step_sound_note(TSEL,&TSEL->step[ui.cursor],sound);
     uint32_t note=had>=0?(uint32_t)had:drum_sound_note(TSEL,sound);
     if(i<RECORD_MAX){note=recording[i].note;step_history.removed=recording_snapshot(i);memset(&step_history.replacement,0,sizeof step_history.replacement);step_history.removed_index=(uint16_t)i;step_history.has_removed=1;recording_remove(TSEL,i);}
     uint32_t remain=0,same=0;
@@ -896,7 +924,7 @@ static void drum_hit_delete(void)
 static void drum_hit_key(uint32_t accent)
 {
     if(chain_busy() || live_rec_sel()){ui_message("STOP TO EDIT");return;}
-    uint32_t sound=ui.drum_sound%drum_sound_count(TSEL),lane=drum_lane(drum_sound_note(TSEL,sound));
+    uint32_t sound=drum_sound_norm(TSEL,ui.drum_sound),lane=drum_lane(drum_sound_note(TSEL,sound));
     if((drum_hit_selected()<RECORD_MAX || step_sound_note(TSEL,&TSEL->step[ui.cursor],sound)>=0) && !accent){drum_hit_delete();return;}
     drum_hit_edit(2,0);
     if(accent){uint32_t i=drum_hit_selected();if(i<RECORD_MAX){fm1_irq_off();recording[i].vel=127;note_assign(&step_history.replacement,&recording[i]);TSEL->step[ui.cursor].acc|=(uint8_t)(1u<<lane);fm1_irq_on();}}
@@ -1655,6 +1683,7 @@ static void page_tap(uint32_t b)
 static void ui_notices(void)
 {
     static uint32_t midi_t, midi_last;
+    drum_follow();
     if (motion_full) { motion_full = 0; ui_message("MOTION FULL"); }
     if (recording_quant_blocked) { recording_quant_blocked = 0; ui_message("QNT STEP OCCUPIED"); }
     if (midi_hint) {                                    /* MIDI notes into a track that is not selected */

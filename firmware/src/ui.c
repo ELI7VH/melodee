@@ -623,6 +623,7 @@ typedef struct {
     cz_patch_t cz;
     p5_patch_t p5;
     drum_patch_t drum;
+    drum_mix_t drum_mix;
     int16_t p[P_COUNT];
     step_snapshot_t step[NSTEP];
     motion_store_t motion_backup; /* one track only, swaps with the shared event pool on undo */
@@ -663,6 +664,7 @@ static uint32_t track_sig(const track_t *t)      /* the sound (an FM6 track's pa
     h = fnv(h, cz_patch[k].raw, CZ_BYTES);
     h = fnv(h,p5_patch_of(&trk[k]),sizeof(p5_patch_t));
     h = fnv(h,&drum_patch[k],sizeof(drum_patch_t));
+    h = fnv(h,&drum_mix[k],sizeof(drum_mix_t));
     for (uint32_t j = 0; j < motion.count; j++)
         if ((motion.event[j].place >> 6) == k) h = fnv(h, &motion.event[j], sizeof motion.event[j]);
     return h ^ ((motion.on >> k) & 1u);
@@ -747,7 +749,7 @@ static void load_begin(track_t *t, uint32_t what)
     memcpy(u->fm6, fm6_patch[i], FP_SIZE);
     u->cz = cz_patch[i];
     u->p5 = *p5_patch_of(&trk[i]);
-    u->drum=drum_patch[i];
+    u->drum=drum_patch[i];u->drum_mix=drum_mix[i];
     u->pat = pat_sig[i];
     u->patn = pat_last[i];
     motion_snapshot_track(t, &u->motion_backup);
@@ -863,6 +865,7 @@ static void undo_step(int redo)
         fm6_set_patch(tr, u->fm6);
         memcpy(u->fm6, v, FP_SIZE);
         {drum_patch_t dp=drum_patch[tr];drum_patch[tr]=u->drum;u->drum=dp;}
+        {drum_mix_t dm=drum_mix[tr];drum_mix[tr]=u->drum_mix;u->drum_mix=dm;}
         { p5_patch_t pp=*p5_patch_of(t);p5_patch[tr]=u->p5;u->p5=pp;p5_ready[tr]=1; }
         { cz_patch_t cp = cz_patch[tr]; cz_patch[tr] = u->cz; u->cz = cp; cz_track_accept(t); }
 
@@ -932,6 +935,7 @@ static void apply_preset_to(track_t *t, uint32_t pi)
     pi %= e->npresets;
     t->preset = (uint8_t)pi;
     memset(&drum_patch[t-trk],0,sizeof(drum_patch_t));
+    memset(&drum_mix[t-trk],0,sizeof(drum_mix_t));
     for (i = 0; i < P_E0; i++)                        /* the rest of the sound to its defaults: a preset */
         if (!param_kept(i))                           /* sounds the same after any edit */
             t->p[i] = TP[i].def;
@@ -1050,19 +1054,22 @@ static void preset_go(uint32_t n)                    /* load list index n into t
 
 /* Stage's (HOME's) four knobs: the selected track's engine's EDIT values (engine_t .knob), a native sound's own panel
  * values for PROPHET (filter, its envelope amount, the amp release) and CZ-1 (line 1's wave and DCW peak, detune,
- * vibrato): a page of their scope, edited and drawn as its pages are (ui_input.c edit_param, ui_stage.c) */
+ * vibrato), DRUM's picked drum and its PITCH TONE DECAY (WaveLoop fork: as DRUM SOUND): a page of their scope, edited
+ * and drawn as its pages are (ui_input.c edit_param, ui_stage.c) */
 static page_t stage_pg;
 static const page_t *stage_page(void)
 {
     static const uint8_t P5_K[4] = {P5_CUTOFF, P5_RESONANCE, P5_ENV_FILTER, P5_RELEASE_AMP};
     static const uint8_t CZ_K[4] = {LCZ_LBASE(0) + LCZ_W1, LCZ_EBASE(0, 1) + 8, LCZ_FINE, LCZ_VDEP};
+    static const uint8_t DRUM_K[4] = {0, 1 + DCF_PITCH, 1 + DCF_TONE, 1 + DCF_DECAY};
     uint32_t e = eng_idx(TSEL->eng_req), k;
     stage_pg.title = "STAGE";
     stage_pg.fam = FAM_HOME;
     stage_pg.graph = GR_NONE;
-    stage_pg.scope = e == ENGI_PROPHET ? SC_P5 : e == ENGI_CZ ? SC_CZ1 : SC_ENGINE;
-    for (k = 0; k < 4u; k++)
-        stage_pg.id[k] = e == ENGI_PROPHET ? P5_K[k] : e == ENGI_CZ ? CZ_K[k] : ENGINES[e]->knob[k];
+    stage_pg.scope = e == ENGI_PROPHET ? SC_P5 : e == ENGI_CZ ? SC_CZ1 : e == ENGI_DRUM ? SC_DRUM : SC_ENGINE;
+    for (k = 0; k < 4u; k++)                     /* (DRUM: the picked drum, its PITCH TONE DECAY: drum_control.c) */
+        stage_pg.id[k] = e == ENGI_PROPHET ? P5_K[k] : e == ENGI_CZ ? CZ_K[k] : e == ENGI_DRUM ? DRUM_K[k] :
+                         ENGINES[e]->knob[k];
     return &stage_pg;
 }
 /* HOME: what KNOB k edits (0: nothing there) */
@@ -1079,6 +1086,10 @@ static void track_select(uint32_t i)
     browse_commit();                             /* (a sound still pending loads into the track it was meant for) */
     momentary_restore();
     song.sel = (uint8_t)i;
+    if (drum_track(TSEL)) {                      /* (the drum picked on that track: drum_control.c) */
+        ui.drum_sound = (uint8_t)drum_picked(TSEL);
+        ui.lane = (uint8_t)drum_lane(drum_sound_note(TSEL, ui.drum_sound));
+    }
     ui.entry_open = 0;
     ui.note_copy = ui.note_move = 0;
     seq_midi_reset();                            /* (MIDI notes held for the other track enter nothing here) */

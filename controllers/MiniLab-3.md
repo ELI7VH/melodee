@@ -16,10 +16,10 @@ change the track you are playing.
 
 | MiniLab | MIDI | Melodee |
 | --- | --- | --- |
-| Top knob 1 | CC74, keyboard channel | Tone (brightness). SID, FM6, CZ-1, Prophet and DRUM |
-| Top knob 2 | CC71, keyboard channel | Character (resonance). SID and Prophet |
-| Top knob 3 | CC5, keyboard channel | Glide |
-| Top knob 4 | CC10, keyboard channel | Pan |
+| Top knob 1 | CC74, keyboard channel | Tone (brightness). SID, FM6, CZ-1, Prophet. DRUM: the picked drum's pitch |
+| Top knob 2 | CC71, keyboard channel | Character (resonance). SID and Prophet. DRUM: the picked drum's tone |
+| Top knob 3 | CC5, keyboard channel | Glide. DRUM: the picked drum's decay |
+| Top knob 4 | CC10, keyboard channel | Pan. DRUM: the picked drum's pan |
 | Bottom knob 5 | CC73, keyboard channel | Attack |
 | Bottom knob 6 | CC75, keyboard channel | Decay |
 | Bottom knob 7 | CC79, keyboard channel | Sustain (not on Prophet, FM6, CZ-1: their own envelopes) |
@@ -32,7 +32,8 @@ change the track you are playing.
 | Shift + main encoder | CC112, relative | Jump to the next / previous engine's first sound |
 | Main encoder, press | CC115 | Select the next track on the FM-1 (after the last: track 1). The encoder then browses that track |
 
-Engines that do not list a knob ignore it.
+Engines that do not list a knob ignore it. On a DRUM track the top knobs shape the drum you played last on it (a
+pad, a key, a note), and the card names it: T4 KICK PITCH.
 
 Tap HOME on the FM-1 for the controls page: every mapped knob, fader, the encoder, the engine buttons and the pads,
 with what each one does on the selected track and its value now (tap HOME again for Stage).

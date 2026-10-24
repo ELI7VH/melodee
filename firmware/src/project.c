@@ -52,6 +52,8 @@ typedef struct {
     cz_patch_t cz[NTRK];
     p5_patch_t p5[NTRK];
     drum_patch_t drum[NTRK];
+    drum_mix_t drum_mix[NTRK];                 /* WaveLoop fork: each drum's PAN, SEND (the tail's 'WL' block) */
+    uint8_t drum_focus[NTRK];                  /* .. and the drum picked on each track */
     recorded_note_t recording[RECORD_MAX];
     uint8_t pattern[NTRK];                     /* FUN13's active-bank ids (also in the full container) */
     char name[PROJ_NAME_LEN];                  /* the project's name: upper-case ASCII 32..126, 0-padded; "" = none */
@@ -230,6 +232,47 @@ static int step_wire_unpack(step_t *s,const uint8_t *b)
     return (meta&7u)<7u && s->probability<=101u && step_acc_valid(s);
 }
 
+/* WaveLoop fork: the reserved tail's 'WL' block, after the user origins ('U' 3): each track's picked drum (a byte)
+ * and its drums' PAN (7 bits) and SEND (8 bits) from the track's (drum_mix). Firmware without it never reads it (the
+ * hash covers it); a record without it loads every drum where its track is */
+#define PROJ_WL_TRACK (1u + (16u * 15u + 7u) / 8u)
+#define PROJ_WL_BYTES (3u + NTRK * PROJ_WL_TRACK)
+static int proj_wl_pack(uint8_t *b, const project_t *q)
+{
+    b[0] = 'W'; b[1] = 'L'; b[2] = 1u;
+    for (uint32_t t = 0; t < NTRK; t++) {
+        uint8_t *d = b + 3u + t * PROJ_WL_TRACK;
+        uint32_t pos = 0;
+        if (q->drum_focus[t] > 15u || !drum_mix_valid(&q->drum_mix[t])) return 0;
+        d[0] = q->drum_focus[t];
+        for (uint32_t i = 0; i < 16u; i++) {
+            wire_bits_put(d + 1, &pos, (uint32_t)(q->drum_mix[t].pan[i] + 64), 7);
+            wire_bits_put(d + 1, &pos, (uint32_t)(q->drum_mix[t].send[i] + 127), 8);
+        }
+    }
+    return 1;
+}
+static int proj_wl_unpack(project_t *q, const uint8_t *b)
+{
+    if (b[0] != 'W' || b[1] != 'L' || b[2] != 1u)
+        return 1;                                       /* (none: every drum where its track is) */
+    for (uint32_t t = 0; t < NTRK; t++) {
+        const uint8_t *d = b + 3u + t * PROJ_WL_TRACK;
+        uint32_t pos = 0;
+        q->drum_focus[t] = (uint8_t)(d[0] & 15u);
+        for (uint32_t i = 0; i < 16u; i++) {
+            q->drum_mix[t].pan[i] = (int8_t)((int32_t)wire_bits_get(d + 1, &pos, 7) - 64);
+            q->drum_mix[t].send[i] = (int8_t)((int32_t)wire_bits_get(d + 1, &pos, 8) - 127);
+        }
+        if (!drum_mix_valid(&q->drum_mix[t])) {             /* (damaged: that track's drums where the track is) */
+            memset(&q->drum_mix[t], 0, sizeof q->drum_mix[t]);
+            q->drum_focus[t] = 0;
+        }
+    }
+    return 1;
+}
+_Static_assert(68u + NTRK * (P_COUNT + 2u + NSTEP * 8u) + sizeof(chain_config_t) + sizeof(motion_store_t) + 2u + 2u * NTRK +
+               PROJ_WL_BYTES <= PROJ_TONE_WIRE, "the 'WL' block fits the reserved tail");
 static int proj_pack(project_store_t *out, const project_t *q)
 {
     uint8_t *b = out->raw; uint32_t pos = 68u, t, i; uint32_t magic = PROJ_MAGIC, size = PROJ_STORE_SIZE, sum;
@@ -256,12 +299,13 @@ static int proj_pack(project_store_t *out, const project_t *q)
             if(!proj_step_pack(b+pos,&q->t[t].step[i]))return 0;pos+=8u;
         }
     }
-    if (pos + sizeof q->chain + sizeof q->motion + 2u + 2u*NTRK > PROJ_TONE_WIRE) return 0;
+    if (pos + sizeof q->chain + sizeof q->motion + 2u + 2u*NTRK + PROJ_WL_BYTES > PROJ_TONE_WIRE) return 0;
     memcpy(b + pos, &q->chain, sizeof q->chain); pos += sizeof q->chain;
     memcpy(b + pos, &q->motion, sizeof q->motion);
     pos += sizeof q->motion;
     b[pos++]='U';b[pos++]=3u;
     for(t=0;t<NTRK;t++){b[pos++]=(uint8_t)q->user[t];b[pos++]=(uint8_t)(q->user[t]>>8);}
+    if(!proj_wl_pack(b+pos,q))return 0;
     memcpy(b + PROJ_FM6_OFF, q->fm6, sizeof q->fm6);
     for (t = 0; t < NTRK; t++) {
         if (!cz_patch_valid(q->cz[t].raw)) return 0;
@@ -359,6 +403,7 @@ static int proj_unpack(project_t *q, const uint8_t *b)
     pos += sizeof q->motion;
     if(pos+2u+2u*NTRK<=PROJ_FM6_OFF && b[pos]=='U' && b[pos+1u]==3u){
         for(t=0;t<NTRK;t++){uint32_t user=b[pos+2u+2u*t]|(uint32_t)b[pos+3u+2u*t]<<8;q->user[t]=(uint16_t)(user<=384u?user:0);}
+        if(pos+2u+2u*NTRK+PROJ_WL_BYTES<=PROJ_TONE_WIRE && !proj_wl_unpack(q,b+pos+2u+2u*NTRK))return 0;
     }else if(pos+2u+NTRK<=PROJ_FM6_OFF && b[pos]==PROJ_P5_ORIGIN_TAG0 && b[pos+1u]==PROJ_P5_ORIGIN_TAG1){
         for(t=0;t<NTRK;t++){uint32_t origin=b[pos+2u+t];if(origin && origin<=128u){uint32_t slot=origin-1u,bank=slot/26u,k=slot%26u,spill=bank*8u+k-18u;q->user[t]=(uint16_t)(1u+(k<18u?(16u+bank)*18u+k:spill<32u?spill/2u*18u+16u+spill%2u:378u+spill-32u));}}
     }
@@ -390,10 +435,10 @@ static int proj_unpack(project_t *q, const uint8_t *b)
 static void proj_legacy_perc(track_t *t)
 {
 
-    const preset_t *pr = &DRUM_PRESETS[0];
+    const preset_t *pr = &DRUM_PRESETS[DRUM_PRESET_CIRCUIT];   /* (the circuits: what DRUM_PRESETS[0] was) */
     t->eng_req = ENGI_DRUM;
     uint32_t i;
-    t->preset = 0;                              /* display metadata; SET remains the legacy kit */
+    t->preset = DRUM_PRESET_CIRCUIT;            /* display metadata; SET remains the legacy kit */
     for (i = 0; i < P_E0; i++)
         if (!param_kept(i))
             t->p[i] = TP[i].def;
@@ -547,6 +592,8 @@ static void project_capture(project_t *p)
         memcpy(p->fm6_fn[i], fm6_fn[i], FM6_NFN);
     }
     memcpy(p->drum,drum_patch,sizeof drum_patch);
+    memcpy(p->drum_mix,drum_mix,sizeof drum_mix);
+    memcpy(p->drum_focus,drum_focus,sizeof drum_focus);
     p->fm6_fn_ok = 1;
     p->motion = motion;
     for (i = 0; i < RECORD_MAX; i++) p->recording[i] = recording_snapshot(i);
@@ -705,6 +752,8 @@ static int project_restore_runtime(const project_t *input)
     pattern_init();
     memcpy(recording, p->recording, sizeof recording);
     memcpy(drum_patch,p->drum,sizeof drum_patch);
+    memcpy(drum_mix,p->drum_mix,sizeof drum_mix);
+    memcpy(drum_focus,p->drum_focus,sizeof drum_focus);
     recording_reindex();
     chain_defaults(&chain_config);
     motion = p->motion;
@@ -726,6 +775,8 @@ static int project_restore_runtime(const project_t *input)
             t->p[i] = param_reserved(i) ? 0 : eng_extra_retired(e) && i >= P_E0 ? s->p[i] : (int16_t)clamp(s->p[i], d->min, d->max);
         }
         t->preset = eng_extra_retired(e) ? s->preset : (uint8_t)(ENGINES[e]->npresets ? (s->preset >= PROJ_DEF_KEEP ? 0u : s->preset) % ENGINES[e]->npresets : 0u);
+        if (e == ENGI_DRUM && !t->preset && t->p[P_E0] <= DK_808)
+            t->preset = DRUM_PRESET_CIRCUIT;            /* (808 KIT was the circuits until KIT 808: its name follows) */
         t->pattern = p->pattern[k];
         memcpy(t->step, s->step, sizeof t->step);
         proj_steps(t->step);
@@ -752,6 +803,10 @@ static int project_restore_runtime(const project_t *input)
     song.ntrk = (uint8_t)(p->parts - 1u < NTRK ? p->parts : NTRK);
     song.sel = (uint8_t)(p->sel < song.ntrk ? p->sel : 0u);
     fm1_irq_on();
+    if (drum_track(TSEL)) {                             /* (the drum picked on it, as it was left) */
+        ui.drum_sound = (uint8_t)drum_picked(TSEL);
+        ui.lane = (uint8_t)drum_lane(drum_sound_note(TSEL, ui.drum_sound));
+    }
     proj_name_get(proj_name, (const uint8_t *)p->name);
     proj_cur = PROJ_NO_SLOT;                            /* (project_load: its slot) */
     undo_clear();                                       /* (ui.c) the undo levels belong to the old project */

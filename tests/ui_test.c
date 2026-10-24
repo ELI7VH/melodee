@@ -418,8 +418,9 @@ static int test_sound_loads(void)
     apply_preset_to(t, 0);
     track_defaults_steps(t);
     project_load(0);
-    bad += check("saved 808 DRUM keeps every parameter and step with valid display metadata",
-                 t->eng_req == ENGI_DRUM && t->preset == 0u && !memcmp(t->p, before.p, sizeof t->p) &&
+    bad += check("saved 808 DRUM keeps every parameter and step with valid display metadata",   /* (named 808 CIRCUIT
+                                                                                                * since KIT 808) */
+                 t->eng_req == ENGI_DRUM && t->preset == DRUM_PRESET_CIRCUIT && !memcmp(t->p, before.p, sizeof t->p) &&
                  !memcmp(t->step, before.step, sizeof t->step));
     printf("ui: undo level %u bytes\n", (unsigned)sizeof undo);
     return bad;

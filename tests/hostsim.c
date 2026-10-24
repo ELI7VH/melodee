@@ -155,7 +155,7 @@ static void host_power_on_sound(track_t *t, uint32_t k) { host_preset(t, TRK_DEF
 /* Explicit legacy fixture: hidden from factory browsing, still used by saved GM projects. */
 static void host_808_kit(track_t *t)
 {
-    host_preset(t, ENGI_DRUM, 0);
+    host_preset(t, ENGI_DRUM, DRUM_PRESET_CIRCUIT);   /* (the circuit models: what preset 0 was until KIT 808) */
 }
 
 static void put_step(track_t *t, uint32_t i, uint32_t n, const uint8_t *notes, uint32_t time, uint32_t flags)

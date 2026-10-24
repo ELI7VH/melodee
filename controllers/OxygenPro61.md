@@ -31,12 +31,12 @@ its settings, press the encoder to change one. Program everything below, then pr
 
 | Control | How to pick it | Set |
 | --- | --- | --- |
-| Knob 1 | turn it | Channel Global, CC 74: tone (SID, FM6, CZ-1, Prophet, DRUM) |
-| Knob 2 | turn it | Channel Global, CC 71: character (SID, Prophet) |
-| Knob 3 | turn it | Channel Global, CC 5: glide |
-| Knob 4 | turn it | Channel Global, CC 10: pan |
-| Knob 5 | turn it | Channel Global, CC 76: LFO rate |
-| Knob 6 | turn it | Channel Global, CC 77: LFO to filter (wobble) |
+| Knob 1 | turn it | Channel Global, CC 74: tone (SID, FM6, CZ-1, Prophet); DRUM: the picked drum's pitch |
+| Knob 2 | turn it | Channel Global, CC 71: character (SID, Prophet); DRUM: the picked drum's tone |
+| Knob 3 | turn it | Channel Global, CC 5: glide; DRUM: the picked drum's decay |
+| Knob 4 | turn it | Channel Global, CC 10: pan; DRUM: the picked drum's pan |
+| Knob 5 | turn it | Channel Global, CC 76: LFO rate; DRUM: the picked drum's FX send |
+| Knob 6 | turn it | Channel Global, CC 77: LFO to filter (wobble); DRUM: the picked drum's level |
 | Knob 7 | turn it | Channel Global, CC 78: LFO to level (tremolo) |
 | Knob 8 | turn it | Channel Global, CC 70: LFO shape (SIN TRI SAW SQR S&H) |
 | Faders 1–4 | move it | Channel 1, 2, 3, 4 (one each), CC 7: track levels |
@@ -54,7 +54,8 @@ The other buttons stay as they are.
 
 ## What you see on the FM-1
 
-A knob turn shows a card with the track, the parameter and its value for under a second. Fader 9 shows MIX with
+A knob turn shows a card with the track, the parameter and its value for under a second. On a DRUM track
+the knobs shape the drum you played last on it (a pad, a key, a note): the card names it, T4 KICK PITCH. Fader 9 shows MIX with
 how loud the computer and the FM-1 each are. The line under the BPM shows
 how far the sound is through its engine's sounds as the encoder walks them.
 

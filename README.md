@@ -409,7 +409,7 @@ user presets saved by earlier Melodee versions are not imported, and the user sa
 ## Features
 
 - **Five selectable instruments:** PROPHET, FM6, CZ-1, SID and DRUM, each with factory presets;
-  DRUM contains synthesized 808 and 909 kits
+  DRUM contains synthesized 808, CR78, 808 circuit, 909 and SID kits
 - **One to four tracks**, one instrument and sound per track: a new song starts with one, so the FM-1 can be a
   single synth; add more when the song needs them. FM6 plays up to 16 voices; PROPHET plays up
   to eight voices per track in the default dual-core build (five if CPU1 is unavailable or disabled).
@@ -819,8 +819,17 @@ calibration; the FPU conversion does not establish hardware fidelity.
   portamento, wheel, foot, breath and aftertouch), saved with the project and the template
 - **CZ-1**: native Casio tones, with separate eight-point pitch, timbre and volume envelopes on each line
 - **SID**: a Commodore MOS 6581 / 8580 per note, modelled at the register level after reSID: three oscillators on the 16-bit frequency register (pulse width 12 bits, the 23-bit noise register, ring modulation, hard sync, combined waveforms sampled from real chips), the chip's envelope generator (16 rates, exponential decay, the ADSR delay), each revision's DACs and cutoff curve, the 6581's thump through the C64's output stage; 32 factory presets. MODEL C64 6581 / C64 8580 plays the track as one channel of a C64 tune: one voice, with frequency, pulse width, cutoff and resonance written once a PAL frame (50 Hz) as a player routine writes them; in POLY a held chord is arpeggiated on that voice, one note a frame, with one gate and envelope for the whole chord
-- **DRUM**: synthesized TR-808 and TR-909 kits with the General MIDI key map. Every drum has its
-  own tuning, decay, tone, attack/snappy and level controls; recorded hits can override pitch and length.
+- **DRUM**: synthesized kits with the General MIDI key map. **808** and **CR78** (the WaveLoop build) are the
+  WaveLoop Kit's eight-lane kits: a deep, long 808 kick and its snare, clap, hats, tom, rim and bell; a dry CR78
+  with maracas, conga and claves. **808 CIRC** is the TR-808 circuit model (songs saved with an 808 before the
+  WaveLoop build keep it, and its preset is 808 CIRCUIT); **909** is the TR-909 model. Play a drum (a key, a pad,
+  a MIDI note on its track, its lane on the grid) to pick it; then shape that drum alone: PITCH, DECAY, TONE
+  (SNAPPY on the snare, ATTACK on the 909 kick and toms), LEVEL, PAN and SEND (not on KIT SID: one chip). Stage's
+  knobs on a DRUM track are the picked drum, its PITCH, TONE and DECAY. A controller's knobs on a DRUM track shape
+  the picked drum: CC74 PITCH, CC71 TONE, CC5 DECAY, CC10 PAN, CC76 SEND, CC77 LEVEL (knobs 1–6 of the
+  [Oxygen](controllers/OxygenPro61.md) preset, the top four of the [MiniLab](controllers/MiniLab-3.md)'s); the knob card names it
+  ("T4 KICK PITCH"). PAN and SEND are against the track's own: zero is where the track is. A track insert FX takes
+  the kit as one. Each drum's settings save with the song. Recorded hits can override pitch and length.
   KIT SID plays the track as a C64 drum routine on one 6581: its three voices take the hits, each drum a
   50 Hz frame program (waveform, frequency slide, gate) on the chip's envelope; TONE and RES set its filter
   for kick, snare, toms and clap; DIGI ON plays kick and snare as 4-bit samples on the volume register

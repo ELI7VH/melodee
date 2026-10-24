@@ -841,7 +841,12 @@ static __attribute__((noinline)) uint32_t track_render_audio(track_t *t, int32_t
         }
         /* 1/16 st and 1/4096 -> Q24 octaves: the voice's own offset (the matrix's pitch too), without TUNE and bend */
         m.plog = (m.pitch16 - tune - bend16 - (int32_t)v->note * 16) * 87381 + (m.fine - tune_fine - bend_fine) * 5909;
-        engine_render(t,v,e,spread_on>v->side?spread_buf:out,n,&m);
+        int32_t *dst=spread_on>v->side?spread_buf:out;
+        if(ti<NTRK && drum_bus_now[ti]){               /* a kit whose drums mix one by one: each voice its bus */
+            uint32_t b=i&(DRUM_BUSES-1u);               /* (drum_control.c, mix.c mix_drum_samples) */
+            dst=drum_bus_now[ti][b];drum_bus_used[ti]|=(uint8_t)(1u<<b);
+        }
+        engine_render(t,v,e,dst,n,&m);
         nr++;
     }
     engine_join();

@@ -26,13 +26,13 @@ static int32_t blocks_peak(uint32_t nb)          /* nb blocks of the mix, its pe
     return pk;
 }
 
-/* part 1 on the DRUM engine's first kit, nothing sounding (host_tracks_init keeps the voices) */
+/* part 1 on the DRUM engine's circuit kit (808 CIRCUIT), nothing sounding (host_tracks_init keeps the voices) */
 static void kit_fresh(void)
 {
     host_tracks_init();
     memset(trk[0].v, 0, sizeof trk[0].v);
     eng_state_reset();
-    host_preset(&trk[0], ENGI_DRUM, 0);
+    host_preset(&trk[0], ENGI_DRUM, DRUM_PRESET_CIRCUIT);
 }
 
 /* one lane struck alone through the engine: the peak of its first nb blocks */
@@ -53,7 +53,7 @@ static void lane_budget(void)
     eng_state_reset();
     for (p = 0; p < NPART; p++)
         memset(trk[p].v, 0, sizeof trk[p].v);
-    host_preset(&trk[0], ENGI_DRUM, 0);
+    host_preset(&trk[0], ENGI_DRUM, DRUM_PRESET_CIRCUIT);
     host_preset(&trk[1], HOST_SYNTH, 0);
     trk[1].p[P_VOICE] = V_POLY;
     trk[1].p[P_SUS] = 127;
@@ -157,7 +157,7 @@ static void engine(void)
     fails += bad != 0;
 }
 
-/* ----------------------------------------------------------- KIT 808 --- */
+/* ------------------------------------------------------- 808 CIRCUIT --- */
 /* the mix's RMS (dB re full scale) over nb blocks */
 static double blocks_rms(uint32_t nb)
 {
@@ -203,17 +203,17 @@ static void kit_808(void)
             bad++;
         }
     }
-    printf("drum_test: KIT 808: the 16 instruments from their GM notes sound and free their voices%s: %s\n", why,
+    printf("drum_test: 808 CIRCUIT: the 16 instruments from their GM notes sound and free their voices%s: %s\n", why,
            bad ? "FAIL" : "ok");
     fails += bad != 0;
     {   /* velocity, the trigger level: 127 louder than 64 (the circuits compress it: brighter more than louder) */
         static const uint8_t V[4] = {36, 38, 39, 56};
         for (i = 0, k = 1; i < 4u; i++) {
             double hi = note_rms(DK_808, V[i], 127), lo = note_rms(DK_808, V[i], 64);
-            printf("drum_test: KIT 808: note %u at velocity 127 %+.1f dB over 64\n", V[i], hi - lo);
+            printf("drum_test: 808 CIRCUIT: note %u at velocity 127 %+.1f dB over 64\n", V[i], hi - lo);
             k &= hi > lo + 2;
         }
-        printf("drum_test: KIT 808: velocity 127 at least 2 dB over 64: %s\n", k ? "ok" : "FAIL");
+        printf("drum_test: 808 CIRCUIT: velocity 127 at least 2 dB over 64: %s\n", k ? "ok" : "FAIL");
         fails += !k;
     }
     {   /* the choke: a closed hat 100 ms into the open one */
@@ -227,7 +227,7 @@ static void kit_808(void)
         trk_note_on(&trk[0], 42, 110);
         blocks_peak(FS / 20u / CTL);
         k = k && !o->r.on;
-        printf("drum_test: KIT 808: a closed hat 100 ms into the open one ends it within 50 ms: %s\n", k ? "ok" : "FAIL");
+        printf("drum_test: 808 CIRCUIT: a closed hat 100 ms into the open one ends it within 50 ms: %s\n", k ? "ok" : "FAIL");
         fails += !k;
     }
     {   /* Old custom-kit values still select the surviving 808 circuit. */
@@ -236,7 +236,7 @@ static void kit_808(void)
         trk_note_on(&trk[0], 36, 110);
         k = drum_kit_part(0)[DV_KICK].r.ins == DR_BD && blocks_peak(4) > 200;
         printf("drum_test: retired custom kit plays 808: %s\n", k ? "ok" : "FAIL");
-        fails += !k || ENG_DRUM.npresets != 4 || ENG_DRUM.edit[0].min != DK_808;
+        fails += !k || ENG_DRUM.npresets != 6 || ENG_DRUM.edit[0].min != DK_808 || ENG_DRUM.edit[0].max != DK_CR78;
     }
     {   /* the corners: TUNE TONE DECY SNAP at 0 / 127, ACC 127, velocity 127, the whole kit at once: no clipping */
         int32_t pk = 0, q;
@@ -255,7 +255,7 @@ static void kit_808(void)
             pk = q > pk ? q : pk;
         }
         k = pk < 32767;
-        printf("drum_test: KIT 808 at the knobs' corners, the 8 lanes at velocity 127: peak %d (< full scale): %s\n", pk,
+        printf("drum_test: 808 CIRCUIT at the knobs' corners, the 8 lanes at velocity 127: peak %d (< full scale): %s\n", pk,
                k ? "ok" : "FAIL");
         fails += !k;
     }

@@ -167,6 +167,7 @@ static void midi_note_event(uint32_t ch, uint32_t note, uint32_t vel)
         midi_expression(t, c);
         if (!midi_play(t, ch, note, vel))           /* (a note the layout silences: no owner) */
             return;
+        drum_focus_note(t, note);                   /* (a DRUM track: the drum hit is the one picked) */
         if (t != TSEL)
             midi_hint = (uint8_t)(trk_index(t) + 1u);
         c->targets |= (uint8_t)(1u << trk_index(t));
@@ -241,6 +242,7 @@ static int midi_track_held(uint32_t track)
  * MIDI_POP_NATIVE | CC for an engine's own envelope), value; seq moves on each change */
 #define MIDI_POP_NATIVE 0x8000u
 #define MIDI_POP_MIX 0x4000u                     /* WaveLoop fork: the monitor crossfade (CC8), value 0..127 */
+#define MIDI_POP_DRUM 0x2000u                    /* WaveLoop fork: | sound << 4 | DCF_*, a drum of the kit's field */
 static volatile uint16_t midi_pop_id;
 static volatile int16_t midi_pop_v;
 static volatile uint8_t midi_pop_trk, midi_pop_seq;
@@ -252,10 +254,16 @@ static void midi_pop_note(const track_t *t, uint32_t id, int32_t v)
     midi_pop_seq++;
 }
 /* what CC cc sets on track t: a parameter (P_*), MIDI_POP_NATIVE | cc for the engine's own envelope (72 73 75 on
- * Prophet, FM6, CZ-1), or P_COUNT: nothing (midi_parameter; the controls page, ui_knobmap.c, names it) */
+ * Prophet, FM6, CZ-1), MIDI_POP_DRUM | DCF_* for the picked drum's field on a DRUM track (WaveLoop fork: knobs 1-4
+ * PITCH TONE DECAY PAN, 5 SEND, 6 LEVEL; eng_drum.c drum_control.c), or P_COUNT: nothing (midi_parameter; the
+ * controls page, ui_knobmap.c, names it) */
 static uint32_t midi_cc_id(const track_t *t, uint32_t cc)
 {
     uint32_t id=P_COUNT;
+    if(t->eng_req==ENGI_DRUM){
+        uint32_t f=cc==74?DCF_PITCH:cc==71?DCF_TONE:cc==5?DCF_DECAY:cc==10?DCF_PAN:cc==76?DCF_SEND:cc==77?DCF_LEVEL:DCF_COUNT;
+        if(f<DCF_PAN || (f<DCF_COUNT && drum_mixes(t)))return MIDI_POP_DRUM|f;   /* (SID: the track's PAN, its LFO) */
+    }
     switch(cc){case 5:id=P_GLIDE;break;case 7:id=P_LEVEL;break;case 10:id=P_PAN;break;
     case 72:id=P_REL;break;case 73:id=P_ATK;break;case 75:id=P_DEC;break;
     case 76:id=P_LRATE;break;case 77:id=P_LD_FLT;break;case 78:id=P_LD_AMP;break;case 70:id=P_LWAVE;break;
@@ -277,6 +285,12 @@ static __attribute__((noinline)) void midi_parameter(track_t *t,uint32_t cc,uint
 {
     uint32_t id=midi_cc_id(t,cc);
     if(id==P_COUNT)return;
+    if(id&MIDI_POP_DRUM){     /* the picked drum's field (not recorded as motion: it is the kit's own) */
+        uint32_t f=id&15u,sound=drum_picked(t);const param_desc_t *d=drum_field_desc(t,sound,f);
+        if(d->max<=d->min)return;
+        drum_field_set(t,sound,f,f==DCF_PAN?(int32_t)value-64:d->min+(int32_t)((value*(uint32_t)(d->max-d->min)+63u)/127u));
+        midi_pop_note(t,MIDI_POP_DRUM|sound<<4|f,drum_field_get(t,sound,f));return;
+    }
     if(id&MIDI_POP_NATIVE){   /* (the engine's own envelope: its motion too) */
         uint8_t old[MO_NATIVE_N];uint32_t f=motion_guard();
         motion_native_peek(t,old);

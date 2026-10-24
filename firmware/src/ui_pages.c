@@ -447,7 +447,7 @@ static void pv_grid_mark(void)                          /* (rows 1 .. 3, over th
 static void pv_grid(int32_t h)
 {
     const track_t *t = TSEL;
-    uint32_t l, i, len = (uint32_t)t->p[P_SLEN], base = ui.bank * 16u, sound = ui.drum_sound % drum_sound_count(t);
+    uint32_t l, i, len = (uint32_t)t->p[P_SLEN], base = ui.bank * 16u, sound = drum_sound_norm(t, ui.drum_sound);
     (void)h;
     pv_grid_mark();
     for (l = 0; l < NLANE; l++) {                       /* (lanes 18 apart from row 6: the name in the label face) */

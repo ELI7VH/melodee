@@ -590,7 +590,7 @@ static int up_load_to(uint32_t k,uint32_t tr)
                 t->p[i] = param_reserved(i) ? 0 : v[i];
         t->preset = 0;
         if (up_native_cz(r))up_cz_raw(r,cz_patch[tr].raw);
-        if(r->engine==ENGI_DRUM){memset(&drum_patch[tr],0,sizeof(drum_patch_t));if(r->ver==UP_VER_DRUM || r->ver==UP_VER_DRUM_GRID)up_drum_raw(r,&drum_patch[tr]);}
+        if(r->engine==ENGI_DRUM){memset(&drum_patch[tr],0,sizeof(drum_patch_t));memset(&drum_mix[tr],0,sizeof(drum_mix_t));if(r->ver==UP_VER_DRUM || r->ver==UP_VER_DRUM_GRID)up_drum_raw(r,&drum_patch[tr]);}
         if(r->engine==ENGI_PROPHET && r->ver==UP_VER_P5){memcpy(&p5_patch[tr],r->packed,sizeof(p5_patch_t));p5_ready[tr]=1;p5_track_accept(t);}
         cz_track_accept(t);
         fm1_irq_on();

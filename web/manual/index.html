@@ -212,7 +212,7 @@
             <tr><td>FM6</td><td>MLVL</td><td>MRAT</td><td>MEG</td><td>DTUN</td></tr>
             <tr><td>CZ-1</td><td>WAVE</td><td>DCW</td><td>DETUNE</td><td>VIBRATO</td></tr>
             <tr><td>SID</td><td>WAVE</td><td>PW</td><td>CUT</td><td>RES</td></tr>
-            <tr><td>Drum</td><td>TUNE</td><td>TONE</td><td>DECY</td><td>SNAP</td></tr>
+            <tr><td>Drum</td><td>DRUM (the picked drum)</td><td>PITCH</td><td>TONE</td><td>DECAY</td></tr>
           </tbody>
         </table>
         <p>On a Drum track, lanes light as they hit. Hold <kbd>OCT−</kbd> for the Stage sheet: Init sound, Save as user…, Favourite, Undo last load, Sound designer, <strong>Add track</strong> and <strong>Remove track</strong>.</p>
@@ -478,36 +478,36 @@
 
         <section id="drum">
           <h3>Drum</h3>
-          <p class="small">808 kit: Hügelton’s TR-808 circuit models. 909 kit: the schwung module <a href="https://github.com/athousanddetails/schwung-9W9" target="_blank" rel="noopener">9W9</a> by AThousandDetails (after ER-99), ported via Charles Vestal’s x0x.</p>
-          <p>Synthesized TR-808, TR-909 and SID kits on the General MIDI key map. SID KIT uses a single 6581 chip whose three voices share the hits; SID DIGI also plays its synthesized kick and snare through the chip’s four-bit volume register. In SID mode, DIGI replaces KICK on the HIT page and RES replaces DRV. The DRUM EDIT pages have <strong>Sound</strong> (KIT / HIT macros), <strong>Drum</strong> (per-instrument Sound and Mix), <strong>Lanes</strong> and <strong>Voice</strong> tabs. On DRUM SOUND and DRUM MIX, black keys pick the drum lane and white keys pick a drum within it; the knobs then shape that drum.</p>
+          <p class="small">808 and CR78 kits: Felucca’s drum voices (Hügelton), voiced for the WaveLoop Kit. 808 CIRC kit: Hügelton’s TR-808 circuit models. 909 kit: the schwung module <a href="https://github.com/athousanddetails/schwung-9W9" target="_blank" rel="noopener">9W9</a> by AThousandDetails (after ER-99), ported via Charles Vestal’s x0x.</p>
+          <p>Synthesized kits on the General MIDI key map: <strong>808</strong> (a deep, long kick, snare, clap, hats, tom, rim and bell), <strong>CR78</strong> (dry, with maracas on CLAP, a conga on TOM and claves on RIM), <strong>808 CIRC</strong> (the TR-808 circuit models: a song or sound saved with the 808 before the WaveLoop build keeps them, and its preset is now called 808 CIRCUIT), <strong>909</strong> and <strong>SID</strong>. SID KIT uses a single 6581 chip whose three voices share the hits; SID DIGI also plays its synthesized kick and snare through the chip’s four-bit volume register. In SID mode, DIGI replaces KICK on the HIT page and RES replaces DRV. The DRUM EDIT pages have <strong>Sound</strong> (KIT / HIT macros), <strong>Drum</strong> (per-instrument Sound and Mix), <strong>Lanes</strong> and <strong>Voice</strong> tabs. Play a drum to pick it — a key, a pad or a MIDI note on its track, or its lane on the grid (the sequencer never picks) — and the screen shows it; the knobs then shape that drum alone. Each track remembers its picked drum.</p>
           <div class="shots">
             <figure class="shot"><img src="stage_drum.png" alt="Drum Stage" width="240" height="240"><figcaption>Drum Stage: lanes light as they hit.</figcaption></figure>
-            <figure class="shot"><img src="drum_sound_808.png" alt="Drum sound page" width="240" height="240"><figcaption>DRUM SOUND: TUNE, DECAY, TONE for the picked drum.</figcaption></figure>
-            <figure class="shot"><img src="drum_mix_909.png" alt="Drum mix page" width="240" height="240"><figcaption>DRUM MIX: LEVEL per drum.</figcaption></figure>
+            <figure class="shot"><img src="drum_sound_808.png" alt="Drum sound page" width="240" height="240"><figcaption>DRUM SOUND: PITCH, DECAY, TONE for the picked drum.</figcaption></figure>
+            <figure class="shot"><img src="drum_mix_909.png" alt="Drum mix page" width="240" height="240"><figcaption>DRUM MIX: LEVEL, PAN, SEND per drum.</figcaption></figure>
             <figure class="shot"><img src="drum.png" alt="Drum step grid" width="240" height="240"><figcaption>The drum grid: white keys step, black keys pick lanes.</figcaption></figure>
           </div>
           <figure class="shot"><img src="map_drum_hit.png" alt="Drum EDIT map with pages in the selected category" width="240" height="240"><figcaption>EDIT map: KNOB 2 chooses a category, KNOB 1 its page.</figcaption></figure>
           <h4>Kit macros (Sound section)</h4>
-          <p>These four-knob pages shape the whole kit at once (also the Stage knobs for TUNE, TONE, DECY and SNAP).</p>
+          <p>These four-knob pages shape the whole kit at once.</p>
           <table>
             <thead><tr><th>Page</th><th>Controls</th></tr></thead>
             <tbody>
-              <tr><td>KIT</td><td>KIT (808, 909 or SID), TUNE (overall pitch), TONE (overall character / brightness), DECY (overall decay).</td></tr>
-              <tr><td>HIT</td><td>SNAP (snare snappy / noise amount), ACC (how strongly velocity changes level — the circuits alone only move about 2&nbsp;dB from soft to hard), KICK (PUNCH keeps the bass-drum attack click; ROUND softens it), DRV (drive into a soft clip, level kept).</td></tr>
+              <tr><td>KIT</td><td>KIT (808 CIRC, 909, SID, 808 or CR78), TUNE (overall pitch), TONE (overall character / brightness), DECY (overall decay).</td></tr>
+              <tr><td>HIT</td><td>SNAP (snare snappy / noise amount), ACC (how strongly velocity changes level — the circuits alone only move about 2&nbsp;dB from soft to hard), KICK (PUNCH keeps the bass-drum attack click; ROUND softens it; not on 808 or CR78, one kick each), DRV (drive into a soft clip, level kept).</td></tr>
             </tbody>
           </table>
           <h4>Per drum (Drum section)</h4>
-          <p>Pick the lane on the black keys and its drum on the white keys, then offset that instrument from the kit macros. DRUM HIT uses the same lane-first ordering and shows the selected drum’s name.</p>
+          <p>Pick a drum (play it, or turn <kbd>KNOB 1</kbd>), then offset it from the kit macros. 808 and CR78 have a drum per lane; another drum’s note on a lane (a low tom, a conga) plays that lane’s drum at its pitch. DRUM HIT uses the same lane-first ordering and shows the selected drum’s name.</p>
           <table>
             <thead><tr><th>Page</th><th>Controls</th></tr></thead>
             <tbody>
-              <tr><td>DRUM SOUND</td><td>DRUM (which instrument), TUNE, DECAY, and TONE (or SNAPPY on the snare; ATTACK on 909 kick / toms).</td></tr>
-              <tr><td>DRUM MIX</td><td>LEVEL for the picked drum.</td></tr>
+              <tr><td>DRUM SOUND</td><td>DRUM (which instrument), PITCH (±24 semitones), DECAY, and TONE (or SNAPPY on the snare; ATTACK on 909 kick / toms).</td></tr>
+              <tr><td>DRUM MIX</td><td>DRUM, LEVEL, PAN and SEND for the picked drum. PAN adds to the track’s pan; SEND shows what the drum sends to the shared FX (SEND 1 in SPLIT) and follows the track’s SEND. With a track insert FX on, the kit goes through it as one. Not on KIT SID (one chip).</td></tr>
               <tr><td>LANES</td><td>Levels for KICK, SNARE, CLAP, HATCL (closed hat).</td></tr>
               <tr><td>LANES 2</td><td>Levels for HATOP (open hat), TOM, RIM, BELL.</td></tr>
             </tbody>
           </table>
-          <p>Stage knobs: TUNE, TONE, DECY, SNAP. The SEQ sequencer drum grid uses white keys for steps and black keys to select which lane; recorded takes use the same NOTES piano roll as other engines after recording stops. A recorded hit can keep its own pitch and length (see <a href="#notes">Notes</a> and DRUM HIT).</p>
+          <p>Stage knobs: the picked drum, its PITCH, TONE and DECAY. A MIDI controller’s knobs on a Drum track shape the picked drum: CC74 PITCH, CC71 TONE, CC5 DECAY, CC10 PAN, CC76 SEND, CC77 LEVEL (knobs 1–6 of the Oxygen preset); the card names it, as <strong>T4 KICK PITCH</strong>, and the controls page names each knob’s target. Every drum’s settings save with the song and come back with it. The SEQ sequencer drum grid uses white keys for steps and black keys to select which lane; recorded takes use the same NOTES piano roll as other engines after recording stops. A recorded hit can keep its own pitch and length (see <a href="#notes">Notes</a> and DRUM HIT).</p>
         </section>
 
         <section id="voice">

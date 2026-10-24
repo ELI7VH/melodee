@@ -22,7 +22,7 @@ typedef struct {
         struct { uint8_t patch[FP_SIZE+1u], fn[FM6_NFN], on; } fm;
         cz_patch_t cz;
         p5_patch_t p5;
-        drum_patch_t drum;
+        struct { drum_patch_t patch; drum_mix_t mix; } drum;
     } raw;
 } designer_sound_t;
 #define DS_ROUTES 160u
@@ -43,7 +43,7 @@ static void designer_snapshot(designer_sound_t *s)
     if(s->eng==ENGI_FM6){memcpy(s->raw.fm.patch,fm6_patch[k],sizeof s->raw.fm.patch);memcpy(s->raw.fm.fn,fm6_fn[k],FM6_NFN);s->raw.fm.on=fm6_on[k];}
     else if(s->eng==ENGI_CZ)s->raw.cz=cz_patch[k];
     else if(s->eng==ENGI_PROPHET)s->raw.p5=*p5_patch_of(t);
-    else if(s->eng==ENGI_DRUM)s->raw.drum=drum_patch[k];
+    else if(s->eng==ENGI_DRUM){s->raw.drum.patch=drum_patch[k];s->raw.drum.mix=drum_mix[k];}
 }
 static void designer_restore(const designer_sound_t *s)
 {
@@ -54,7 +54,7 @@ static void designer_restore(const designer_sound_t *s)
     if(s->eng==ENGI_FM6){fm6_put_patch(k,s->raw.fm.patch,0);memcpy(fm6_fn[k],s->raw.fm.fn,FM6_NFN);fm6_on[k]=s->raw.fm.on;}
     else if(s->eng==ENGI_CZ){cz_patch[k]=s->raw.cz;cz_track_accept(t);}
     else if(s->eng==ENGI_PROPHET){p5_patch[k]=s->raw.p5;p5_ready[k]=1;}
-    else if(s->eng==ENGI_DRUM)drum_patch[k]=s->raw.drum;
+    else if(s->eng==ENGI_DRUM){drum_patch[k]=s->raw.drum.patch;drum_mix[k]=s->raw.drum.mix;}
     sync_reload=1;
 }
 static void designer_compare(void)

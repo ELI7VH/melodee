@@ -5,7 +5,8 @@
 #include "recording_test.c"
 static void kit(uint32_t model)
 {
-    midi_test_reset();set_engine_of(TSEL,ENGI_DRUM);apply_preset_to(TSEL,model==DK_909);TSEL->engine=TSEL->eng_req;panic_req=0;song.master_q12=4096;
+    uint32_t preset=model==DK_909?1u:model==DK_KIT808?0u:model==DK_CR78?4u:DRUM_PRESET_CIRCUIT;   /* (808 KIT: the Kit's) */
+    midi_test_reset();set_engine_of(TSEL,ENGI_DRUM);apply_preset_to(TSEL,preset);TSEL->engine=TSEL->eng_req;panic_req=0;song.master_q12=4096;
 }
 static void scope(uint32_t sc)
 {ui.home=0;for(uint32_t i=0;i<NPAGES;i++)if(PAGES[i].scope==sc){ui.page=(uint8_t)i;break;}ui.force=1;}
@@ -155,8 +156,117 @@ static int capacity_and_controls(void)
     }
     return bad;
 }
+/* WaveLoop fork: KIT 808 and CR78 (the Kit's drum_voice.c) through the engine: every lane sounds, stays bounded and
+ * frees its voice; a lane is mono; the hats choke; the corners stay under full scale; the 808's kick is lower and
+ * longer than the CR78's (independent of re-baselined numbers) */
+static int32_t audio_left(int32_t *buf,uint32_t blocks)   /* blocks of the mix, its left channel into buf */
+{
+    int32_t out[2*CTL],peak=0;
+    for(uint32_t b=0;b<blocks;b++){mix_block(out,CTL);for(uint32_t i=0;i<CTL;i++){buf[b*CTL+i]=out[2*i];int32_t a=out[2*i]<0?-out[2*i]:out[2*i];if(a>peak)peak=a;}}
+    return peak;
+}
+static uint32_t kick_crossings(const int32_t *y,uint32_t from,uint32_t to)
+{uint32_t n=0;for(uint32_t i=from+1;i<to;i++)n+=(y[i-1]<0)!=(y[i]<0);return n;}
+static uint32_t ring_ms(const int32_t *y,uint32_t len)      /* until 10 ms frames stay 30 dB under the loudest */
+{
+    double e[400]={0},top=0;uint32_t f,frames=len/441u,last=0;
+    for(f=0;f<frames && f<400u;f++){for(uint32_t i=0;i<441u;i++)e[f]+=(double)y[f*441u+i]*y[f*441u+i];if(e[f]>top)top=e[f];}
+    for(f=0;f<frames && f<400u;f++)if(e[f]>top/1000.0)last=f;
+    return last*10u;
+}
+static int kits_kit(void)
+{
+    static int32_t y[FS*4];
+    int bad=0;
+    for(uint32_t model=DK_KIT808;model<=DK_CR78;model++){
+        int ok=1;
+        for(uint32_t l=0;l<DV_NLANE;l++){
+            kit(model);trk_note_on(TSEL,DRUM_LANE_NOTE[l],110);
+            int32_t peak=audio(FS/CTL);audio(FS*5/CTL);
+            ok&=peak>30 && peak<32768 && !active_count();
+        }
+        bad+=check(model==DK_KIT808?"KIT 808: each lane sounds, stays bounded and frees its voice":"CR78: each lane sounds, stays bounded and frees its voice",ok);
+        kit(model);trk_note_on(TSEL,41,110);audio(4);trk_note_on(TSEL,43,110);audio(2);
+        dvk_part_t *K=dvk_of(TSEL);
+        bad+=check("a Kit lane is mono: two toms, one voice, the second hit",active_count()==1 && K && K->lane[DV_TOM].owner && TSEL->v[K->lane[DV_TOM].owner-1u].note==43);
+        kit(model);trk_note_on(TSEL,46,110);audio(FS/10/CTL);int open=K && K->lane[DV_HATO].v.live;
+        trk_note_on(TSEL,42,110);audio(FS/20/CTL);
+        bad+=check("a Kit's closed hat chokes its open hat",open && !dvk_of(TSEL)->lane[DV_HATO].v.live);
+        int32_t worst=0;
+        for(uint32_t c=0;c<16u;c++){
+            kit(model);for(uint32_t p=P_E1;p<=P_E4;p++)TSEL->p[p]=(c>>(p-P_E1))&1u?127:0;TSEL->p[P_E5]=127;TSEL->p[P_E7]=127;
+            for(uint32_t i=0;i<16;i++){int8_t *d=drum_patch[0].c[i];d[0]=c&1u?24:-24;d[1]=d[2]=c&2u?63:-64;}
+            for(uint32_t l=0;l<DV_NLANE;l++)trk_note_on(TSEL,DRUM_LANE_NOTE[l],127);
+            int32_t q=audio(FS/CTL);if(q>worst)worst=q;
+        }
+        bad+=check("a Kit at every knob and drum corner, all lanes at velocity 127: under full scale",worst<32767);
+    }
+    kit(DK_CR78);
+    bad+=check("CR78 names its maracas, conga and claves",!strcmp(drum_sound_name(TSEL,D9_CP),"MARAC") && !strcmp(drum_lane_name(TSEL,DV_TOM),"CONGA") &&
+               !strcmp(drum_sound_abbr(TSEL,D9_RS),"CL") && drum_sound_count(TSEL)==DV_NLANE && drum_sound_norm(TSEL,D9_LT)==D9_MT);
+    uint32_t hz[2],ms[2];
+    for(uint32_t k=0;k<2u;k++){
+        kit(k?DK_CR78:DK_KIT808);trk_note_on(TSEL,36,110);audio_left(y,FS*2/CTL);
+        hz[k]=kick_crossings(y,FS*6/100,FS*15/100)*100u/18u;ms[k]=ring_ms(y,FS*2);   /* (crossings/2 per 90 ms -> Hz) */
+    }
+    printf("drum editor: kicks: 808 %u Hz %u ms, CR78 %u Hz %u ms\n",hz[0],ms[0],hz[1],ms[1]);
+    bad+=check("the Kit's 808 kick is lower and longer than its CR78 kick",hz[0]+5u<=hz[1] && ms[0]>ms[1]*3u/2u);
+    kit(DK_KIT808);
+    bad+=check("808 KIT is the Kit's 808, 808 CIRCUIT the circuits; old ids keep their sound",DRUM_PRESETS[0].e[0]==DK_KIT808 && DRUM_PRESETS[DRUM_PRESET_CIRCUIT].e[0]==DK_808 &&
+               !strcmp(DRUM_PRESETS[4].name,"CR78 KIT") && ENG_DRUM.edit[0].def==DK_KIT808 && !strcmp(N_DRUM_KIT[DK_808],"808 CIRC"));
+    return bad;
+}
+/* WaveLoop fork: each drum shaped on its own (drum_control.c): picked by a hit, its knobs, its own place in the mix,
+ * kept with the song */
+static int per_drum(void)
+{
+    static int32_t a[FS/4],b[FS/4];
+    int32_t out[2*CTL];
+    int bad=0;
+    kit(DK_KIT808);trk_note_on(TSEL,36,100);audio(1);dvk_part_t *K=dvk_of(TSEL);int16_t tune=K->lane[DV_KICK].key.tune;
+    drum_field_set(TSEL,D9_BD,DCF_PITCH,12);trk_note_on(TSEL,36,100);audio(1);
+    bad+=check("PITCH moves the picked Kit drum an octave, the others not",K->lane[DV_KICK].key.tune==tune+192 && drum_field_get(TSEL,D9_SD,DCF_PITCH)==0);
+    drum_field_set(TSEL,D9_SD,DCF_DECAY,0);kit(DK_KIT808);
+    bad+=check("loading a kit starts every drum from its design",!drum_patch[0].c[D9_SD][1] && !drum_mix[0].pan[D9_SD]);
+    /* the mix: nothing set is the one bus; a pan set elsewhere leaves this drum where it was; its own pan moves it */
+    for(uint32_t pass=0;pass<3u;pass++){
+        kit(DK_KIT808);lim_env=LIM_T;dc_l=dc_r=dce_l=dce_r=0;   /* (the master's limiter and DC states: as new) */
+        if(pass)drum_mix[0].pan[D9_BD]=40;if(pass==2u)drum_mix[0].pan[D9_SD]=-64;
+        trk_note_on(TSEL,38,110);
+        double l=0,r=0;int on=0;
+        for(uint32_t blk=0;blk<FS/4/CTL;blk++){mix_block(out,CTL);on|=drum_bus_used[0]!=0;for(uint32_t i=0;i<CTL;i++){if(pass<2u)(pass?b:a)[blk*CTL+i]=out[2*i];l+=(double)out[2*i]*out[2*i];r+=(double)out[2*i+1]*out[2*i+1];}}
+        if(pass==0)bad+=check("a kit with no drum PAN or SEND mixes as one bus",!on);
+        if(pass==1){int32_t worst=0;for(uint32_t i=0;i<FS/4;i++){int32_t d=a[i]-b[i];d=d<0?-d:d;if(d>worst)worst=d;}
+            printf("drum editor: one bus against a bus per voice: worst sample difference %d\n",worst);
+            bad+=check("its drums on their own buses: an untouched drum sounds as on the one bus",worst<=1);}
+        if(pass==2)bad+=check("a drum's own PAN places it (snare hard left)",l>r*100.0);
+    }
+    kit(DK_KIT808);song.g[G_FXRETURN]=100;TSEL->p[P_FXSEND]=50;
+    drum_field_set(TSEL,D9_SD,DCF_SEND,90);
+    bad+=check("SEND is the drum's against the track's, and follows it",drum_mix[0].send[D9_SD]==40 && drum_field_get(TSEL,D9_SD,DCF_SEND)==90 &&
+               (TSEL->p[P_FXSEND]=100,drum_field_get(TSEL,D9_SD,DCF_SEND)==127) && drum_field_get(TSEL,D9_BD,DCF_SEND)==100);
+    /* a hit picks; the knobs shape what is picked; the card names it */
+    kit(DK_KIT808);midi_test_reset();set_engine_of(TSEL,ENGI_DRUM);apply_preset_to(TSEL,0);TSEL->engine=TSEL->eng_req;panic_req=0;
+    ui.drum_sound=D9_BD;queued(0x90,38,100,0);ui_notices();
+    bad+=check("a MIDI note on the drum track picks its drum on screen",drum_focus[0]==D9_SD && ui.drum_sound==D9_SD && ui.lane==DV_SNARE);
+    queued(0xB0,74,127,0);queued(0xB0,10,0,0);queued(0xB0,77,0,0);
+    bad+=check("knobs 1, 4, 6 set the picked drum's PITCH, PAN, LEVEL",drum_patch[0].c[D9_SD][0]==24 && drum_mix[0].pan[D9_SD]==-64 && drum_patch[0].c[D9_SD][3]==127 &&
+               !drum_patch[0].c[D9_BD][0] && midi_pop_id==(MIDI_POP_DRUM|D9_SD<<4|DCF_LEVEL));
+    bad+=check("the controls page names the picked drum's targets",midi_cc_id(TSEL,74)==(MIDI_POP_DRUM|DCF_PITCH) && midi_cc_id(TSEL,76)==(MIDI_POP_DRUM|DCF_SEND) &&
+               midi_cc_id(TSEL,78)==P_LD_AMP);
+    ui.home=1;page_over=stage_page();edit_param(1,-3);page_over=0;ui.home=0;
+    bad+=check("Stage's knob 2 on a DRUM track is the picked drum's PITCH",drum_patch[0].c[D9_SD][0]==21);
+    kb_note[0]=42;key_on(0,TSEL);key_off(0,TSEL);ui_notices();
+    bad+=check("a key played on the drum track picks its drum",drum_focus[0]==D9_CH && ui.drum_sound==D9_CH);
+    /* kept with the song: project round trip, and a record without the block */
+    drum_mix[0].pan[D9_HT]=-17;drum_mix[0].send[D9_CR]=-90;drum_focus[0]=D9_OH;
+    project_capture(&proj_scratch);project_store_t wire;project_t decoded;
+    int ok=proj_pack(&wire,&proj_scratch) && proj_import(&decoded,&wire,sizeof wire);
+    bad+=check("each drum's PAN, SEND and the picked drum survive the song's round trip",ok && !memcmp(decoded.drum_mix,drum_mix,sizeof drum_mix) && decoded.drum_focus[0]==D9_OH);
+    return bad;
+}
 int main(void)
 {
-    int bad=voices909()+controls()+edits_and_store()+capacity_and_controls()+order_and_lanes()+corners909();
+    int bad=voices909()+controls()+edits_and_store()+capacity_and_controls()+order_and_lanes()+corners909()+kits_kit()+per_drum();
     printf("DRUM EDITOR: %s\n",bad?"FAILED":"all passed");return bad!=0;
 }

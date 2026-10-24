@@ -59,7 +59,7 @@ static uint32_t eng_state_size(uint32_t e)
 #endif
     case ENGI_CZ: return sizeof(cz_part_t);
     case 3: return sizeof(sid_part_t);              /* SID (eng_sid.c) */
-    case ENGI_DRUM: return sizeof(drum909_part_t);
+    case ENGI_DRUM: return sizeof(drum909_part_t);   /* (its largest KIT: eng_drum.c drum_bytes) */
     case ENGI_FM6: return sizeof(fm6_part_t);
 #if MELODEE_SLICE
     case ENGI_SLICE: return sizeof(slc_rb_t);
@@ -79,7 +79,17 @@ static int eng_state_prepare(const track_t *t)
 }
 static phys_slot_t *phys_slots(uint32_t part) { return resource_get(RES_ENGINE0 + part % NPART, sizeof(phys_slot_t) * PHYS_POLY); }
 static drum909_part_t *drum909_part(uint32_t part) { return resource_get(RES_ENGINE0 + part % NPART, sizeof(drum909_part_t)); }
-static drum_lane_t *drum_kit_part(uint32_t part) { return resource_get(RES_ENGINE0 + part % NPART, sizeof(drum_lane_t) * DV_NLANE); }
+static dr8_part_t *dr8_part(uint32_t part) { return resource_get(RES_ENGINE0 + part % NPART, sizeof(dr8_part_t)); }
+static drum_lane_t *drum_kit_part(uint32_t part)
+{
+    dr8_part_t *k = dr8_part(part);
+    return k ? k->lane : 0;
+}
+static int drum_state_ready(const track_t *t)
+{
+    return resource[RES_ENGINE0 + (uint32_t)(t - trk) % NPART].size == ((drum_bytes(t) + 3u) & ~3u);
+}
+static dvk_part_t *dvk_part(uint32_t part) { return resource_get(RES_ENGINE0 + part % NPART, sizeof(dvk_part_t)); }
 static dsk_part_t *dsk_part(uint32_t part) { return resource_get(RES_ENGINE0 + part % NPART, sizeof(dsk_part_t)); }
 static drw_part_t *drw_of(const track_t *t) { return resource_get(RES_ENGINE0 + (uint32_t)(t - trk), sizeof(drw_part_t)); }
 static fm6_part_t *fm6_part(uint32_t part) { return resource_get(RES_ENGINE0 + part % NPART, sizeof(fm6_part_t)); }
