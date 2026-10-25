@@ -1,5 +1,7 @@
 # Melodee
 
+> WaveLoop: this fork is one of several; the index of all our FM-1 work (units, forks, Choppa sends, tools) is `fm1/README.md` in the WaveLoop repo (lucian-labs/waveloop).
+
 [![License: GPL-3.0-only](https://img.shields.io/badge/license-GPL--3.0--only-blue.svg)](LICENSE)
 
 ![Current Melodee screens: HOME, SONG, MOTION and FX](docs/media/melodee-screens.svg)
