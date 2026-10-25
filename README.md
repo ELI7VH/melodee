@@ -426,7 +426,8 @@ user presets saved by earlier Melodee versions are not imported, and the user sa
 - **Chord keys:** one finger plays an in-key chord (triads or sevenths of the scale, or fixed chord
   shapes), with voicings; on the keys, MIDI in, recording and the arpeggiator
 - **Arpeggiator** with REPEAT and a beat LED, 70 scales with a white-key mode, glide,
-  MONO / LEGATO / UNISON
+  MONO / LEGATO / UNISON. Mono sounds play the last key pressed: a new note sounds while the last is still held
+  (the WaveLoop build loads every preset this way; PRIO on the voice page still picks LOW or HIGH)
 - **Modulation matrix:** 4 slots per track, MIDI controllers as sources
 - **Dry mixer:** track level, pan and synth voice spread, optional per-track FX, with output protection
 - **Quick layers:** hold GLO or SCL for shortcuts on the keys and knobs; double-press to lock

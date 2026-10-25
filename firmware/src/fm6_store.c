@@ -100,7 +100,8 @@ static void fm6_sysex(const uint8_t *b, uint32_t n)
         case 64:                                         /* MONO: Dexed's (legato, the highest key) */
             trk[tr].p[P_VOICE] = v ? V_LEGATO : V_POLY;
             if (v)
-                trk[tr].p[P_PRIO] = 2;
+                trk[tr].p[P_PRIO] = 0;                   /* WaveLoop fork: LAST, not Dexed's highest key: a new note
+                                                         * always plays while the last is held */
             break;
         case 65:
             fm6_fn_set(f, FN_PBUP, (int32_t)v);

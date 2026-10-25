@@ -250,7 +250,9 @@ static void p5_track_accept(track_t *t)
 {
     const uint8_t *p=p5_patch_of(t)->raw;
     t->p[P_VOICE]=p[P5_UNISON]?V_UNISON:V_POLY;
-    t->p[P_PRIO]=p[P5_RETRIGGER]<2u?1:0;
+    t->p[P_PRIO]=0;      /* WaveLoop fork: LAST, whatever the patch's retrigger (the original's low-note priority held
+                          * a bass's next note back until the first was let go); the PRIO page still sets LOW / HIGH */
+    (void)p[P5_RETRIGGER];
     t->p[P_DETUNE]=clamp(p[P5_UNISON_DETUNE],0,7)*127/7;
     t->p[P_ALLOC]=1; /* repeated keys reuse a voice, as the original does */
 }
